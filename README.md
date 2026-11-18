@@ -7,23 +7,34 @@
 커널의 `rbtree` + 전역 락(global lock)과, 직접 구현한 skip list + 노드별 락(fine-grained lock)을
 커널 모듈로 만들어 멀티스레드 처리량(throughput)과 지연(latency)을 비교한다.
 
+## 팀
+
+| 역할 | 이름 | 담당 |
+|---|---|---|
+| A · PM | 강성준 | 전체 설계·프로젝트 관리, 측정 틀, rbtree baseline |
+| B | 이은찬 | skip list v1, 정합성 검증 |
+| C | 이우신 | skip list v2 (노드별 락) |
+| D | 종주원 | 실험 자동화, 분석, 발표 총괄 |
+
+역할별 상세 할 일은 [TEAM_GUIDE.md](TEAM_GUIDE.md) 참고.
+
 ## 구현
 
 | 이름 | 내용 | 담당 |
 |---|---|---|
-| baseline | 커널 `rb_root` + spinlock/rwlock | A |
-| skip v1 | skip list + 락 1개 (rbtree와 같은 조건 비교, v2 보험) | B |
-| skip v2 | lazy skip list, 노드별 락 (핵심) | C |
-| skip v3 (선택) | RCU 기반 lock-free 탐색 | D |
+| baseline | 커널 `rb_root` + spinlock/rwlock | 강성준 |
+| skip v1 | skip list + 락 1개 (rbtree와 같은 조건 비교, v2 보험) | 이은찬 |
+| skip v2 | lazy skip list, 노드별 락 (핵심) | 이우신 |
+| skip v3 (선택) | RCU 기반 lock-free 탐색 | 종주원 |
 
 ## 폴더 구조
 
 ```
 include/ds_ops.h      공통 인터페이스 (전원 합의)
-harness/              측정 틀: kthread 워커, 작업 부하, ktime 측정 (A)
+harness/              측정 틀: kthread 워커, 작업 부하, ktime 측정 (강성준)
 ds/                   구현: rbtree_lock.c, skiplist_v1.c, skiplist_v2.c, skiplist_rcu.c
-tests/                정합성 검사 (B)
-scripts/              실험 실행 · 그래프 (D)
+tests/                정합성 검사 (이은찬)
+scripts/              실험 실행 · 그래프 (종주원)
 results/              측정 결과 CSV
 ```
 
@@ -49,13 +60,13 @@ sudo rmmod bench_rb
 ## 협업 규칙
 
 - `main`에 직접 push 금지. 각자 브랜치(`feat/...`)에서 작업 → PR
-- 리뷰 짝: A ↔ B, C ↔ D (짝이 approve하면 merge)
+- 리뷰 짝: 강성준 ↔ 이은찬, 이우신 ↔ 종주원 (짝이 approve하면 merge)
 - 구현마다 파일을 나눠서 충돌을 피한다
 - 빌드 산출물(`*.o`, `*.ko` 등)은 커밋하지 않는다 (`.gitignore`)
 
 ## 일정
 
-| 주차 | A | B | C | D |
+| 주차 | 강성준 (A) | 이은찬 (B) | 이우신 (C) | 종주원 (D) |
 |---|---|---|---|---|
 | 1주 (~11/24) | baseline + 측정 틀 | v1 구현 | v2 설계 | 스크립트 · 논문 조사 |
 | 2주 (~12/1) | 통합 · 정합성 테스트 | C와 페어 | v2 구현 | 1차 측정 · 그래프 |
