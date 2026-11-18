@@ -1,0 +1,68 @@
+# skiplist-vs-rbtree
+
+중앙대 「리눅스 시스템 응용 설계」 텀프로젝트 — **Improving performance of kernel source code (data structure)**
+
+> 락을 잘게 쪼개면, 스레드가 늘수록 빨라진다.
+
+커널의 `rbtree` + 전역 락(global lock)과, 직접 구현한 skip list + 노드별 락(fine-grained lock)을
+커널 모듈로 만들어 멀티스레드 처리량(throughput)과 지연(latency)을 비교한다.
+
+## 구현
+
+| 이름 | 내용 | 담당 |
+|---|---|---|
+| baseline | 커널 `rb_root` + spinlock/rwlock | A |
+| skip v1 | skip list + 락 1개 (rbtree와 같은 조건 비교, v2 보험) | B |
+| skip v2 | lazy skip list, 노드별 락 (핵심) | C |
+| skip v3 (선택) | RCU 기반 lock-free 탐색 | D |
+
+## 폴더 구조
+
+```
+include/ds_ops.h      공통 인터페이스 (전원 합의)
+harness/              측정 틀: kthread 워커, 작업 부하, ktime 측정 (A)
+ds/                   구현: rbtree_lock.c, skiplist_v1.c, skiplist_v2.c, skiplist_rcu.c
+tests/                정합성 검사 (B)
+scripts/              실험 실행 · 그래프 (D)
+results/              측정 결과 CSV
+```
+
+## 빌드 방식
+
+구현 하나 + harness를 묶어 모듈 하나로 만든다 (예: `bench_rb.ko`, `bench_sl1.ko`).
+`Makefile`의 주석 처리된 줄을 구현이 생길 때마다 풀어서 추가한다.
+
+```bash
+make            # 모듈 빌드
+sudo insmod bench_rb.ko   # 실행 (파라미터는 harness에서 정의)
+dmesg | tail
+sudo rmmod bench_rb
+```
+
+## 실험 변수
+
+- 원소 수 N: 1만 / 10만 / 100만
+- 스레드 수: 1 / 2 / 4
+- 작업 비율: 삽입만 / 탐색만 / 탐색 90:삽입 10 / 50:50
+- 조건마다 여러 번 반복 → 평균 ± 편차. 최종 측정은 한 사람의 VM에서 통일
+
+## 협업 규칙
+
+- `main`에 직접 push 금지. 각자 브랜치(`feat/...`)에서 작업 → PR
+- 리뷰 짝: A ↔ B, C ↔ D (짝이 approve하면 merge)
+- 구현마다 파일을 나눠서 충돌을 피한다
+- 빌드 산출물(`*.o`, `*.ko` 등)은 커밋하지 않는다 (`.gitignore`)
+
+## 일정
+
+| 주차 | A | B | C | D |
+|---|---|---|---|---|
+| 1주 (~11/24) | baseline + 측정 틀 | v1 구현 | v2 설계 | 스크립트 · 논문 조사 |
+| 2주 (~12/1) | 통합 · 정합성 테스트 | C와 페어 | v2 구현 | 1차 측정 · 그래프 |
+| 3주 (15주차 수업 전) | 최종 측정 | 분석 보조 | v2 안정화 · (선택) v3 | 슬라이드 · 리허설 |
+
+## 참고
+
+- W. Pugh, *Skip Lists: A Probabilistic Alternative to Balanced Trees*, CACM 1990
+- M. Herlihy et al., *A Simple Optimistic Skiplist Algorithm* (lazy skip list), SIROCCO 2007
+- Robert Love, *Linux Kernel Development*
