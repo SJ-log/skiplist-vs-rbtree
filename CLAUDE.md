@@ -23,6 +23,7 @@
 - 스레드 수 1·2·4·8 (VM의 vCPU 수까지)
 - 범위 탐색 실험 추가: 스캔 스레드 1 + 쓰기 스레드 1·2·4, scan_len 100·1,000
 - 분석용 카운터: 연산당 이동 노드 수, v2 검증 실패 재시도 횟수. 컴파일 옵션으로만 켠다
+- PR 확인은 리뷰 짝 대신 강성준(PM)이 전부 맡는다 (강성준의 PR은 이은찬)
 - 날짜 기반 일정 대신 의존 순서로 관리한다. 병목은 `docs/index.html`의 "병목" 섹션 참고
 
 ## 역할
@@ -34,7 +35,8 @@
 | C | 이우신 | skip v2 (lazy skip list, 노드별 락) |
 | D | 종주원 | 실험 스크립트·그래프·발표 총괄, maple tree |
 
-리뷰 짝: 강성준 ↔ 이은찬, 이우신 ↔ 종주원
+PR 확인: 모든 PR은 강성준이 확인·merge (강성준의 PR은 이은찬).
+백업 짝: 강성준 ↔ 이은찬, 이우신 ↔ 종주원 — 서로의 파트를 설명할 수 있게 유지
 
 ## 구조
 
@@ -70,6 +72,7 @@ docs/             팀 공유 페이지, 역할별 인수인계
 ## Git 규칙
 
 - `main` 직접 push 금지. 브랜치: `feat/harness`, `feat/sl-v1`, `feat/sl-v2`, `feat/maple`, `feat/scripts`, `docs/...`
-- PR → 리뷰 짝 approve → merge (제안: approve 받으면 작성자가 merge, PM은 main 빌드만 확인)
+- PR → 강성준(PM)이 확인·approve → merge. 강성준 본인의 PR은 이은찬이 확인 (`.github/CODEOWNERS`로 리뷰 요청이 자동으로 간다)
+- PR은 단계 하나씩 작게 올리고 `.github/pull_request_template.md`의 체크리스트를 채운다
 - 커밋 메시지 `영역: 무엇을` (예: `harness: add start barrier`)
 - 빌드 산출물(`*.o`, `*.ko` 등)은 커밋하지 않는다

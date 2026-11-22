@@ -488,7 +488,7 @@ footer ol{font-size:15px}
 
 <section class="band" id="study"><div class="wrap">
 <div class="sh"><h2>공부할 것: 모두 같이 7가지, 그다음 자기 노선</h2>
-<p>공통 7가지는 모두가 설명할 수 있어야 한다. 리뷰 짝이 빠져도 그 부분을 대신 설명할 수 있게 하는 게 기준이다.</p></div>
+<p>공통 7가지는 모두가 설명할 수 있어야 한다. 짝이 빠져도 그 부분을 대신 설명할 수 있게 하는 게 기준이다.</p></div>
 <div class="g2" style="align-items:start;gap:clamp(24px,4vw,56px)">
 <div><h3 style="margin-bottom:18px">모두 공통</h3>
 <ol class="stl">
@@ -498,7 +498,7 @@ footer ol{font-size:15px}
 <li><b>커널 rbtree API</b><span>내 구조체에 rb_node 넣기, rb_link_node · rb_insert_color · rb_erase. Documentation/core-api/rbtree.rst, LKD 6장.</span></li>
 <li><b>skip list 원리</b><span>층 수는 동전 던지기로 정한다. 위층에서 건너뛰고 넘치면 내려간다. 평균 O(log n). Pugh 1990.</span></li>
 <li><b>동시성 기본</b><span>경쟁 조건, 교착 상태, 락을 잡는 순서. READ_ONCE가 왜 필요한지 정도까지.</span></li>
-<li><b>Git PR 흐름</b><span>feat/ 브랜치 → PR → 리뷰 짝 approve → merge.</span></li>
+<li><b>Git PR 흐름</b><span>feat/ 브랜치 → PR → 강성준이 확인·approve → merge. 체크리스트는 PR 템플릿에 있다.</span></li>
 </ol></div>
 <div class="rsl"><h3 style="margin-bottom:4px">역할별</h3>
 <div class="card"><h4><span class="dot" style="background:var(--red)"></span>A 강성준 · 측정 틀</h4><ul>
@@ -527,12 +527,13 @@ footer ol{font-size:15px}
 
 <section class="band alt" id="roles"><div class="wrap">
 <div class="sh"><h2>역할: 각자 자기 노선 하나</h2>
-<p>사람마다 색이 곧 자기 구현의 색이다. 리뷰 짝은 강성준 ↔ 이은찬, 이우신 ↔ 종주원. 짝이 빠져도 그 부분을 설명할 수 있게 유지한다.</p></div>
+<p>사람마다 색이 곧 자기 구현의 색이다. 모든 PR은 강성준이 확인하고, 강성준의 PR은 이은찬이 확인한다. 백업 짝(강성준 ↔ 이은찬, 이우신 ↔ 종주원)은 서로의 파트를 설명할 수 있게 유지한다.</p></div>
 <div class="roles">
 <article class="role" style="--c:var(--red)">
 <div class="rh"><span class="rl">A</span><div><h3>강성준 · PM</h3><p>측정 틀 + 기준 구현 rbtree</p></div></div>
 <ul>
 <li>PM: 첫 회의 진행, 저장소와 브랜치 보호, 주 1회 15분 점검</li>
+<li><b>모든 PR 확인과 merge</b> (내 PR은 이은찬이 확인)</li>
 <li>측정 틀: 파라미터, 미리 채우기, kthread N개 동시 출발, 1~8 스레드와 CPU 고정</li>
 <li>부하: 탐색·삽입·삭제 비율 섞기, 범위 탐색 스레드</li>
 <li>rbtree + spinlock / rwlock, range 포함</li>
@@ -621,7 +622,7 @@ footer ol{font-size:15px}
 <text x="320" y="191">v1</text><text x="480" y="191">정합성 검사</text>
 <text x="320" y="271">v2 설계</text><text x="480" y="271" style="font-weight:800">v2 구현·안정화</text>
 <text x="320" y="351">실험 스크립트</text><text x="480" y="351">maple tree</text>
-<text x="640" y="318">통합·정합성 테스트</text>
+<text x="640" y="318">통합·PR 확인 (A)</text>
 <text x="800" y="233">최종 측정 (VM 1대)</text><text x="940" y="233">그래프·발표</text>
 </g>
 <text x="332" y="135" class="lvl">harness에 끼워 돌림</text>
@@ -648,7 +649,7 @@ footer ol{font-size:15px}
 <div class="bn"><span class="num">2</span><div><h4>측정 틀 (A) <span class="sev h">높음</span></h4><dl><dt>왜 막히나</dt><dd>v1·v2·maple tree 모두 harness에 끼워야 돌려 볼 수 있고, D의 스크립트도 harness 출력을 읽는다.</dd><dt>기다리는 사람</dt><dd>B, C, D</dd><dt>푸는 법</dt><dd>A가 아무 일도 안 하는 더미 구현으로 harness를 먼저 올린다. 기능은 삽입·탐색 → 삭제 섞기 → 스캔 스레드 순서로 덧붙인다. 그동안 다른 사람은 각자 작은 테스트 모듈로 혼자 검증한다.</dd></dl></div></div>
 <div class="bn max"><span class="num">3</span><div><h4>v2 구현·안정화 (C) <span class="sev x">가장 큼</span></h4><dl><dt>왜 막히나</dt><dd>가장 어렵고, 핵심 결과와 최종 측정이 전부 v2를 기다린다.</dd><dt>기다리는 사람</dt><dd>최종 측정, 발표의 결과 파트</dd><dt>푸는 법</dt><dd>구현 전에 의사코드와 락 순서 문서를 B와 리뷰한다. 탐색 → 삽입 → 삭제 순서로 작은 PR을 올린다. C에게 다른 일을 얹지 않는다. 끝내 불안정하면 v1 결과 + v2 설계·부분 결과 + 막힌 이유 분석으로 발표한다.</dd></dl></div></div>
 <div class="bn"><span class="num">4</span><div><h4>정합성 검사 함수 (B) <span class="sev m">중간</span></h4><dl><dt>왜 막히나</dt><dd>v2 스트레스 테스트가 이 함수로 통과 여부를 판정한다.</dd><dt>기다리는 사람</dt><dd>C</dd><dt>푸는 법</dt><dd>B가 노드 구조체와 검사 함수부터 공개한다. v1이 완성되기 전이어도 된다. C는 같은 뼈대 위에 필드만 추가한다.</dd></dl></div></div>
-<div class="bn"><span class="num">5</span><div><h4>A에게 몰린 통합과 merge <span class="sev m">중간</span></h4><dl><dt>왜 막히나</dt><dd>A가 PM, harness, rbtree, 통합까지 맡아서 모든 PR이 한 사람을 거친다. A가 바쁘면 전원이 멈춘다.</dd><dt>기다리는 사람</dt><dd>전원</dd><dt>푸는 법</dt><dd>리뷰 짝이 approve하면 작성자가 직접 merge하고, A는 main이 빌드되는지만 확인한다.</dd></dl></div></div>
+<div class="bn"><span class="num">5</span><div><h4>A에게 몰린 PR 확인과 통합 <span class="sev h">높음</span></h4><dl><dt>왜 막히나</dt><dd>모든 PR을 A가 확인하고 merge한다. A는 측정 틀, rbtree, 통합도 맡고 있어서 A가 바쁘면 전원의 PR이 기다린다.</dd><dt>기다리는 사람</dt><dd>전원</dd><dt>푸는 법</dt><dd>PR은 단계 하나씩 작게 올리고, PR 템플릿 체크리스트(빌드, RESULT 출력, 검사 함수, 코딩 스타일)를 채워서 올린다. A는 자기 코드보다 리뷰 요청을 먼저 처리한다. A 본인의 PR은 이은찬이 확인한다.</dd></dl></div></div>
 <div class="bn"><span class="num">6</span><div><h4>최종 측정 → 그래프 → 발표 <span class="sev m">중간</span></h4><dl><dt>왜 막히나</dt><dd>공정하게 재려면 VM 한 대에서만 측정해야 해서 마지막에 한 사람, 한 대로 몰린다. 결과가 늦으면 D의 발표 준비가 밀린다.</dd><dt>기다리는 사람</dt><dd>D</dd><dt>푸는 법</dt><dd>스크립트를 한 번 실행으로 끝나게 만들고, rbtree와 v1으로 1차 측정을 미리 돌려 본다. 슬라이드는 결과 외 부분(배경, 설계, 방법)부터 만들고 그래프 자리는 비워 둔다.</dd></dl></div></div>
 </div>
 <div class="card" style="margin-top:20px"><h3>병목 1을 푸는 첫 회의 안건</h3>
@@ -669,7 +670,7 @@ footer ol{font-size:15px}
 <div class="card"><h3>Git</h3><ul>
 <li><code>main</code>에 직접 push하지 않는다</li>
 <li>브랜치는 <code>feat/harness</code>, <code>feat/sl-v2</code>, <code>feat/maple</code>처럼</li>
-<li>PR → 리뷰 짝 approve → merge</li>
+<li>PR → 강성준이 확인·approve → merge (강성준의 PR은 이은찬)</li>
 <li>빌드 산출물(<code>*.o</code>, <code>*.ko</code>)은 커밋하지 않는다</li>
 <li>커밋 메시지는 <code>영역: 무엇을</code></li></ul></div>
 <div class="card"><h3>커널 모듈 안전</h3><ul>
