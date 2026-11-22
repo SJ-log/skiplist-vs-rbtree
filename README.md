@@ -7,6 +7,9 @@
 커널의 `rbtree` + 전역 락(global lock)과, 직접 구현한 skip list + 노드별 락(fine-grained lock)을
 커널 모듈로 만들어 멀티스레드 처리량(throughput)과 지연(latency)을 비교한다.
 
+**최신 계획은 팀 공유 페이지 [`docs/index.html`](docs/index.html)에 있다** (내려받아 브라우저로 열기).
+역할별 인수인계: [`docs/part-A-harness.md`](docs/part-A-harness.md) (A · 측정 틀 + rbtree).
+
 ## 팀
 
 | 역할 | 이름 | 담당 |
@@ -24,8 +27,9 @@
 |---|---|---|
 | baseline | 커널 `rb_root` + spinlock/rwlock | 강성준 |
 | skip v1 | skip list + 락 1개 (rbtree와 같은 조건 비교, v2 보험) | 이은찬 |
+| maple tree | 커널 maple tree (읽기 RCU, 쓰기 락 1개). 커널의 최신 답과 비교 | 종주원 |
 | skip v2 | lazy skip list, 노드별 락 (핵심) | 이우신 |
-| skip v3 (선택) | RCU 기반 lock-free 탐색 | 종주원 |
+| skip v3 (선택) | RCU 기반 lock-free 탐색, 여유 있을 때만 | 종주원 |
 
 ## 폴더 구조
 
@@ -53,9 +57,10 @@ sudo rmmod bench_rb
 ## 실험 변수
 
 - 원소 수 N: 1만 / 10만 / 100만
-- 스레드 수: 1 / 2 / 4
-- 작업 비율: 삽입만 / 탐색만 / 탐색 90:삽입 10 / 50:50
-- 조건마다 여러 번 반복 → 평균 ± 편차. 최종 측정은 한 사람의 VM에서 통일
+- 스레드 수: 1 / 2 / 4 / 8 (VM의 vCPU 수까지)
+- 작업 비율 (탐색·삽입·삭제): 100·0·0 / 90·5·5 / 50·25·25 / 0·50·50 — 삽입과 삭제를 같은 비율로 섞어 원소 수를 유지
+- 범위 탐색 실험: 스캔 스레드 1 + 쓰기 스레드 1·2·4, 스캔 길이 100·1,000
+- 조건마다 5번 반복 → 평균 ± 편차. 최종 측정은 한 사람의 VM에서 통일
 
 ## 협업 규칙
 
