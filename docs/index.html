@@ -1,0 +1,1038 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Skip List vs rbtree</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;600;700;800&family=JetBrains+Mono:wght@400;600&family=Noto+Sans+KR:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+/* VOICE   work: a briefing four teammates read before splitting up a kernel project
+   IDEA    a metro map: skip list levels are express and local lines, each teammate runs one coloured line
+   PICTURE skip list drawn as express/local lines with a train searching a key; a live lock simulator below
+   COLOUR  white or night #0e1116, black ink; red rbtree·A, slate v1·B, blue v2·C, green maple·D, amber = waiting points
+   TYPE    Figtree 800 + Figtree, Noto Sans KR for Hangul, JetBrains Mono for code
+   LAYOUT  title and key facts across the top, metro picture full width beneath; every section is a station */
+:root{color-scheme:light dark;--bg:light-dark(#ffffff,#0e1116);--ink:light-dark(#121418,#eef1f6);--mute:light-dark(#566070,#9aa4b5);--rule:light-dark(#e2e5ea,#2a3241);--panel:light-dark(#f3f5f8,#151b24);--red:light-dark(#e6261f,#ff5c52);--blue:light-dark(#0a5cff,#5c95ff);--green:light-dark(#00a05a,#33cf88);--slate:light-dark(#5c6676,#a9b2c1);--amber:#ffb400;--onamber:#16120a;--bk:light-dark(#16181d,#343a47)}
+:root[data-theme=light]{color-scheme:light}
+:root[data-theme=dark]{color-scheme:dark}
+*{box-sizing:border-box;min-width:0}
+html{scroll-padding-top:76px;scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.62 Figtree,"Noto Sans KR",system-ui,sans-serif;overflow-x:clip;-webkit-font-smoothing:antialiased;word-break:keep-all;overflow-wrap:break-word}
+h1,h2,h3,h4{margin:0;font-weight:800;line-height:1.12;letter-spacing:-.02em;text-wrap:balance}
+h1{font-size:clamp(40px,6vw,60px);line-height:1.02}
+h2{font-size:clamp(27px,3.3vw,40px)}
+h3{font-size:20px;letter-spacing:-.01em}
+h4{font-size:17px;letter-spacing:-.01em}
+p{margin:0 0 12px}
+ul,ol{margin:0;padding-left:1.2em}
+li{margin:5px 0}
+a{color:var(--blue);text-underline-offset:3px}
+code,pre{font-family:"JetBrains Mono",ui-monospace,Menlo,monospace}
+code{font-size:.85em;background:var(--panel);padding:1px 6px;border-radius:6px;overflow-wrap:anywhere}
+.alt code,.card code{background:var(--bg)}
+.alt .card code{background:var(--panel)}
+pre{margin:0;overflow-x:auto;font-size:14px;line-height:1.65;background:var(--bk);color:#eef1f6;padding:20px 22px;border-radius:14px;tab-size:4}
+pre code{background:none!important;padding:0;color:inherit;font-size:inherit}
+.wrap{max-width:1240px;margin:0 auto}
+.band{--halo:var(--bg);padding-block:clamp(44px,5.5vw,80px);padding-left:max(5vw,16px,env(safe-area-inset-left,0px));padding-right:max(5vw,16px,env(safe-area-inset-right,0px))}
+.alt{background:var(--panel);--halo:var(--panel)}
+.scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.fig{position:relative}
+.fig>svg,.fig>canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+.mute{color:var(--mute)}
+.small{font-size:14px}
+.phone-only{display:none}
+svg text{font-family:Figtree,"Noto Sans KR",sans-serif;font-size:13px;font-weight:600;fill:var(--ink);paint-order:stroke;stroke:var(--halo,var(--bg));stroke-width:4px;stroke-linejoin:round}
+svg text.nostroke,svg text.w{stroke:none}
+svg text.w{fill:#fff;font-size:12px;font-weight:700;text-anchor:middle}
+svg .lvl{fill:var(--mute)}
+svg .key{font-weight:700}
+
+.top{border-bottom:1px solid var(--rule);background:var(--bg);z-index:20;padding:8px max(5vw,16px)}
+@media(min-width:900px){.top{position:sticky;top:0}}
+.topin{display:flex;align-items:center;gap:4px 24px;flex-wrap:wrap}
+.brand{font-weight:800;font-size:18px;color:var(--ink);text-decoration:none;white-space:nowrap;display:flex;align-items:center;gap:10px;min-height:44px}
+.brand i{width:16px;height:16px;border-radius:50%;border:4px solid var(--blue);display:inline-block}
+.nav{display:flex;gap:2px;flex:1 1 auto}
+.nav a{flex:none;padding:10px 12px;border-radius:999px;color:var(--ink);text-decoration:none;font-weight:600;font-size:15px}
+.nav a:hover{background:var(--panel)}
+@media(max-width:899px){.nav{flex-basis:100%}.phone-only{display:inline}}
+
+.head{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);gap:clamp(24px,4vw,64px);align-items:end}
+.q{font-size:clamp(20px,2.3vw,26px);font-weight:700;margin:14px 0;letter-spacing:-.01em;line-height:1.3}
+.lede{color:var(--mute);max-width:60ch;margin:0}
+.facts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:24px;margin:0;border-top:3px solid var(--ink)}
+.facts div{padding:12px 0;border-bottom:1px solid var(--rule)}
+.facts dt{font-size:13px;color:var(--mute)}
+.facts dd{margin:2px 0 0;font-weight:700;line-height:1.35}
+#hero{height:clamp(260px,30vw,340px);margin-top:clamp(20px,3vw,36px)}
+.cap{display:flex;flex-wrap:wrap;align-items:center;gap:6px 18px;font-size:14px;color:var(--mute);margin-top:6px}
+.cap b{color:var(--ink)}
+.sw{display:inline-flex;align-items:center;gap:7px}
+.sw i{width:22px;height:6px;border-radius:3px;display:inline-block}
+@media(max-width:760px){.head{grid-template-columns:minmax(0,1fr)}}
+
+.sh{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px clamp(24px,4vw,64px);align-items:end;margin-bottom:clamp(24px,3vw,40px)}
+.sh p{margin:0;color:var(--mute);max-width:62ch}
+.sh h2{display:flex;align-items:flex-start;gap:14px}
+.sh h2::before{content:"";flex:none;width:26px;height:26px;margin-top:5px;border-radius:50%;border:6px solid var(--ink);background:var(--halo)}
+@media(max-width:760px){.sh{grid-template-columns:minmax(0,1fr)}}
+.card{background:var(--panel);--halo:var(--panel);border-radius:16px;padding:clamp(18px,2vw,26px)}
+.alt .card{background:var(--bg);--halo:var(--bg)}
+.g2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px}
+.g3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:20px}
+@media(max-width:900px){.g3{grid-template-columns:minmax(0,1fr)}}
+@media(max-width:700px){.g2{grid-template-columns:minmax(0,1fr)}}
+.dot{display:inline-block;width:12px;height:12px;border-radius:50%;flex:none}
+.ex h3{display:flex;align-items:center;gap:10px}
+.ex svg{width:100%;height:auto;display:block;margin:10px 0 12px}
+
+.ctrl{display:flex;flex-wrap:wrap;align-items:center;gap:12px 16px;margin:16px 0}
+.seg{display:inline-flex;border:2px solid var(--ink);border-radius:999px;overflow:hidden;max-width:100%}
+.seg button{min-height:44px;min-width:46px;padding:0 15px;border:0;background:transparent;color:var(--ink);font:inherit;font-weight:700;cursor:pointer;white-space:nowrap}
+.seg button+button{border-left:2px solid var(--ink)}
+.seg button[aria-pressed=true]{background:var(--ink);color:var(--bg)}
+.btn{min-height:44px;padding:0 18px;border:2px solid var(--rule);border-radius:999px;background:var(--bg);color:var(--ink);font:inherit;font-weight:700;cursor:pointer}
+.btn:hover{border-color:var(--ink)}
+button:focus-visible,a:focus-visible,input:focus-visible{outline:3px solid var(--amber);outline-offset:2px}
+@media(max-width:480px){.seg button{padding:0 9px;font-size:14px;min-width:40px}}
+.sim{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px}
+.simp{background:var(--bg);--halo:var(--bg);border-radius:16px;padding:18px;border:1px solid var(--rule)}
+.simp h4{display:flex;align-items:center;gap:8px}
+.simp .sub{font-size:14px;color:var(--mute);margin:2px 0 0}
+.simp .fig{height:270px;margin:8px 0}
+.read{display:flex;gap:10px 28px;align-items:baseline;flex-wrap:wrap}
+.read b{font-size:30px;font-weight:800;font-variant-numeric:tabular-nums;line-height:1}
+.read span{font-size:14px;color:var(--mute)}
+.verdict{margin:18px 0 8px;font-size:18px;font-weight:700}
+.verdict em{font-style:normal;background:var(--amber);color:var(--onamber);padding:1px 8px;border-radius:6px;white-space:nowrap}
+@media(max-width:760px){.sim{grid-template-columns:minmax(0,1fr)}.simp .fig{height:250px}}
+
+.story{position:relative;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));margin:4px 0 36px}
+.story::before{content:"";position:absolute;left:16.6%;right:16.6%;top:19px;height:8px;border-radius:4px;background:var(--ink)}
+.stn{text-align:center;position:relative;padding:0 6px}
+.stn i{display:block;width:46px;height:46px;margin:0 auto 10px;border-radius:50%;background:var(--halo);border:8px solid currentColor}
+.stn b{display:block;font-size:17px;color:var(--ink);line-height:1.3}
+.stn span{display:block;font-size:14px;color:var(--mute)}
+.tok{position:absolute;top:13px;left:16.6%;width:20px;height:20px;margin-left:-10px;border-radius:50%;background:var(--amber);border:3px solid var(--ink);animation:ride 6s ease-in-out infinite}
+@keyframes ride{0%,8%{left:16.6%}42%,58%{left:50%}92%,100%{left:83.4%}}
+table{border-collapse:collapse;width:100%}
+th,td{text-align:left;padding:12px 10px;border-bottom:1px solid var(--rule);vertical-align:top}
+th{font-size:14px;color:var(--mute);font-weight:600}
+.y,.n{display:inline-flex;align-items:center;gap:8px;white-space:nowrap}
+.y::before,.n::before{content:"";width:14px;height:14px;border-radius:50%;flex:none;box-sizing:border-box}
+.y::before{background:var(--ink)}
+.n::before{border:2px solid var(--mute)}
+.n{color:var(--mute)}
+tr.core td{background:color-mix(in srgb,var(--blue) 10%,transparent)}
+.nm{display:inline-flex;align-items:center;gap:10px;font-weight:700}
+.star{background:var(--blue);color:#fff;font-size:12px;font-weight:800;padding:2px 8px;border-radius:999px;white-space:nowrap}
+.pairs{display:grid;gap:12px;margin-top:16px}
+.pair{display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px}
+.chip{display:inline-flex;align-items:center;gap:8px;min-height:34px;padding:0 14px;border-radius:999px;background:var(--bg);font-weight:700;font-size:15px;white-space:nowrap}
+.alt .chip{background:var(--panel)}
+.alt .card .chip{background:var(--panel)}
+
+.cw{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(0,1fr);gap:clamp(20px,3vw,40px);align-items:start}
+#chart{height:380px;margin-top:8px}
+.tag{display:inline-block;font-size:13px;font-weight:800;padding:3px 10px;border-radius:999px;background:var(--amber);color:var(--onamber);white-space:nowrap}
+.hyp{list-style:none;padding:0;margin:0;display:grid;gap:16px}
+.hyp li{display:grid;grid-template-columns:auto minmax(0,1fr);gap:12px;margin:0}
+.hyp .h{width:34px;height:34px;border-radius:50%;display:grid;place-items:center;font-weight:800;font-size:15px;background:var(--ink);color:var(--bg)}
+.hyp b{display:block;font-size:17px}
+@media(max-width:900px){.cw{grid-template-columns:minmax(0,1fr)}#chart{height:320px}}
+#scanFig{height:270px;margin:6px 0 10px}
+.hgrp{margin:14px 0}
+.hl{font-weight:700;font-size:15px;margin-bottom:6px}
+.hrow{display:grid;grid-template-columns:5.4em minmax(0,1fr) 4.6em;gap:10px;align-items:center;font-size:14px;margin:4px 0}
+.track{display:block;height:14px;border-radius:7px;background:var(--rule);overflow:hidden}
+.bar{display:block;height:100%;border-radius:7px;animation:grow 1.4s cubic-bezier(.2,.8,.2,1) both}
+@keyframes grow{from{width:0}}
+.hv{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;font-weight:700}
+
+.vars{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:20px}
+.vars h4{margin-bottom:12px}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.figs{display:grid;grid-template-columns:repeat(auto-fit,minmax(11em,1fr));gap:20px;margin:30px 0;border-top:3px solid var(--ink);padding-top:18px}
+.big b{display:block;font-size:clamp(34px,4.2vw,50px);font-weight:800;line-height:1.05;letter-spacing:-.02em;font-variant-numeric:tabular-nums;white-space:nowrap}
+.big span{font-size:14px;color:var(--mute)}
+@media(max-width:800px){.vars{grid-template-columns:minmax(0,1fr)}}
+
+.archsvg{min-width:760px;width:100%;height:auto;display:block}
+.bnsvg{min-width:900px;width:100%;height:auto;display:block}
+.cwrap{position:relative}
+.copy{position:absolute;top:8px;right:8px;min-height:44px;padding:0 16px;border-radius:999px;border:1px solid #ffffff40;background:#ffffff14;color:#eef1f6;font:inherit;font-size:14px;font-weight:700;cursor:pointer}
+
+.stl{list-style:none;margin:0;padding:0 0 0 40px;position:relative}
+.stl::before{content:"";position:absolute;left:11px;top:12px;bottom:14px;width:6px;border-radius:3px;background:var(--blue)}
+.stl li{position:relative;margin:0;padding:0 0 18px}
+.stl li::before{content:"";position:absolute;left:-40px;top:1px;width:28px;height:28px;border-radius:50%;background:var(--halo);border:6px solid var(--ink)}
+.stl b{display:block;font-size:17px}
+.stl span{display:block;font-size:15px;color:var(--mute)}
+.rsl{display:grid;gap:14px}
+.rsl h4{display:flex;align-items:center;gap:10px;margin-bottom:6px}
+.rsl ul{font-size:15px}
+
+.roles{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px}
+.role{background:var(--bg);--halo:var(--bg);border-radius:18px;padding:clamp(20px,2.4vw,30px)}
+.rh{display:flex;align-items:center;gap:14px;margin-bottom:14px}
+.rl{width:54px;height:54px;flex:none;border-radius:50%;border:8px solid var(--c);display:grid;place-items:center;font-weight:800;font-size:20px;background:var(--bg)}
+.rh h3{font-size:22px}
+.rh p{margin:2px 0 0;color:var(--mute);font-size:15px}
+.role ul{font-size:15px}
+.rk{display:grid;grid-template-columns:5.6em minmax(0,1fr);gap:8px 14px;margin:16px 0 0;font-size:15px;border-top:1px solid var(--rule);padding-top:14px}
+.rk dt{color:var(--mute);font-weight:600}
+.rk dd{margin:0}
+.rk code{background:var(--panel)}
+@media(max-width:800px){.roles{grid-template-columns:minmax(0,1fr)}}
+.pres{display:grid;gap:10px;margin-top:12px}
+.pr{display:grid;grid-template-columns:minmax(0,16em) minmax(0,1fr) 3em;gap:14px;align-items:center;font-size:15px}
+.pr .track{height:16px;border-radius:8px}
+.who{display:inline-flex;gap:4px;margin-left:8px;vertical-align:middle}
+@media(max-width:600px){.pr{grid-template-columns:minmax(0,1fr) 3em;gap:4px 10px}.pr .track{grid-column:1/-1;order:3}}
+
+.legend{display:flex;flex-wrap:wrap;gap:8px 22px;font-size:14px;color:var(--mute);margin:12px 0 28px}
+.bns{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}
+.bn{display:grid;grid-template-columns:auto minmax(0,1fr);gap:16px;background:var(--panel);border-radius:16px;padding:20px}
+.bn.max{box-shadow:inset 0 0 0 3px var(--amber)}
+.num{width:42px;height:42px;border-radius:50%;background:var(--amber);color:var(--onamber);font-weight:800;display:grid;place-items:center;font-size:18px}
+.bn h4{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:8px 0 10px}
+.sev{font-size:12px;font-weight:800;padding:2px 9px;border-radius:999px;white-space:nowrap;letter-spacing:0}
+.sev.x{background:var(--red);color:#fff}
+.sev.h{background:var(--ink);color:var(--bg)}
+.sev.m{box-shadow:inset 0 0 0 1.5px var(--mute);color:var(--mute)}
+.bn dl{display:grid;grid-template-columns:max-content minmax(0,1fr);gap:6px 12px;margin:0;font-size:15px}
+.bn dt{color:var(--mute);font-weight:600}
+.bn dd{margin:0}
+@media(max-width:800px){.bns{grid-template-columns:minmax(0,1fr)}}
+.pulse{transform-box:fill-box;transform-origin:center;animation:pulse 2s ease-out infinite}
+@keyframes pulse{0%{transform:scale(.8);opacity:.95}100%{transform:scale(2.1);opacity:0}}
+.agenda{list-style:none;padding:0;margin:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 24px}
+.agenda li{margin:0}
+.agenda label{display:flex;gap:12px;align-items:flex-start;min-height:44px;padding:9px 0;cursor:pointer;border-bottom:1px solid var(--rule)}
+.agenda input{width:22px;height:22px;margin:1px 0 0;accent-color:var(--blue);flex:none}
+@media(max-width:700px){.agenda{grid-template-columns:minmax(0,1fr)}}
+.rules h3{margin-bottom:10px}
+.rules ul{font-size:15px}
+footer{background:var(--bk);color:#e9edf3}
+footer a{color:#9cc0ff}
+footer ol{font-size:15px}
+
+.rb .nn{transform-box:fill-box;transform-origin:center;animation:pop 4.8s ease-out infinite}
+@keyframes pop{0%,12%{transform:scale(0)}22%,100%{transform:scale(1)}}
+.rb .toB{animation:toB 4.8s infinite}
+@keyframes toB{0%,40%{fill:var(--red)}50%,100%{fill:var(--bk)}}
+.rb .toR{animation:toR 4.8s infinite}
+@keyframes toR{0%,40%{fill:var(--bk)}50%,100%{fill:var(--red)}}
+.rb .zone{animation:zone 4.8s infinite}
+@keyframes zone{0%,28%{opacity:0}36%,88%{opacity:1}100%{opacity:0}}
+.sk .nn{animation:drop 4.8s ease-out infinite}
+@keyframes drop{0%,30%{transform:translateY(-44px);opacity:0}42%,100%{transform:translateY(0);opacity:1}}
+.sk .lk{animation:lk 4.8s infinite}
+@keyframes lk{0%,10%{opacity:0}18%,64%{opacity:1}74%,100%{opacity:0}}
+.sk .nl{animation:nl 4.8s infinite}
+@keyframes nl{0%,40%{opacity:0}48%,100%{opacity:1}}
+.sk .hot{animation:hot 4.8s infinite}
+@keyframes hot{0%,10%{stroke:var(--ink)}18%,64%{stroke:var(--blue)}74%,100%{stroke:var(--ink)}}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}html{scroll-behavior:auto}}
+@media(max-width:600px){table{font-size:14px}th,td{padding:8px 4px}.stack thead{display:none}.stack tr{display:grid;padding-block:10px;border-bottom:1px solid var(--rule)}.stack td{display:flex;justify-content:space-between;gap:12px;border:0;padding:4px 0;text-align:right}.stack td::before{content:attr(data-l);color:var(--mute);font-weight:600;text-align:left;flex:none;max-width:45%}}
+</style>
+<script>new MutationObserver(()=>{for(const c of document.querySelectorAll('.stack td:not([data-l])')){let i=0,p=c;while(p=p.previousElementSibling)i+=p.colSpan;c.dataset.l=c.closest('table').rows[0].cells[i]?.textContent||''}}).observe(document,{childList:true,subtree:true})</script>
+</head>
+<body>
+
+<header class="top"><div class="wrap topin">
+<a class="brand" href="#top"><i></i>Skip List vs rbtree</a>
+<nav class="nav scroll" aria-label="섹션">
+<a href="#what">프로젝트</a><a href="#lineup">구현</a><a href="#prove">증명할 것</a><a href="#exp">실험</a><a href="#arch">구조</a><a href="#study">공부</a><a href="#roles">역할</a><a href="#bottleneck">병목</a><a href="#rules">규칙</a>
+</nav>
+</div></header>
+
+<section class="band" id="top"><div class="wrap">
+<div class="head">
+<div>
+<h1>Skip List vs rbtree</h1>
+<p class="q">여러 스레드가 동시에 쓰면, 누가 더 잘 버틸까?</p>
+<p class="lede">커널의 rbtree는 보통 트리 전체에 락 하나를 건다. 우리는 노드마다 락을 거는 skip list를 커널 모듈로 직접 만들고, 스레드를 1개에서 8개로 늘려 가며 누가 더 많이 처리하는지 잰다.</p>
+</div>
+<dl class="facts">
+<div><dt>과제 유형</dt><dd>커널 소스 성능 개선 · 자료구조</dd></div>
+<div><dt>만드는 것</dt><dd>구현 5개 + 측정 틀 1개, 전부 커널 모듈</dd></div>
+<div><dt>핵심 주장</dt><dd>락을 잘게 쪼개면 스레드가 늘수록 빨라진다</dd></div>
+<div><dt>제출과 발표</dt><dd>슬라이드 + 소스 코드 · 팀당 10분</dd></div>
+</dl>
+</div>
+<div class="fig" id="hero"><svg role="img" aria-label="4층 skip list를 급행과 완행 노선처럼 그린 그림. 기차가 위층에서 크게 건너뛰다가 한 층씩 내려가며 키를 찾는다."></svg></div>
+<div class="cap"><span id="heroCap"><b>키 25</b> 찾는 중</span><span class="sw"><i style="background:var(--blue)"></i>위층은 급행: 멀리 건너뜀</span><span class="sw"><i style="background:var(--slate)"></i>L0은 완행: 모든 키가 있음</span><span class="sw"><i style="background:var(--amber)"></i>탐색 경로</span></div>
+</div></section>
+
+<section class="band alt" id="what"><div class="wrap">
+<div class="sh"><h2>락이 덮는 범위가 성능을 정한다</h2>
+<p>여러 스레드가 정렬된 키 집합 하나에 동시에 넣고, 찾고, 지운다. 이때 락을 어디까지 거느냐에 따라 스레드를 늘렸을 때 처리량이 달라진다. 이걸 커널 안에서 직접 만들어 재는 게 이 프로젝트다.</p></div>
+<div class="g2">
+<article class="card ex">
+<h3><span class="dot" style="background:var(--red)"></span>rbtree: 트리 전체에 락 1개</h3>
+<svg class="rb" viewBox="0 0 320 224" role="img" aria-label="rbtree에 키 45를 넣자 25, 30, 40의 색이 바뀐다. 트리 전체를 락 하나가 감싼다.">
+<rect x="6" y="40" width="308" height="180" rx="16" fill="none" stroke="var(--red)" stroke-width="2" stroke-dasharray="6 5"/>
+<g transform="translate(18 28)"><rect x="-6" y="-12" width="94" height="24" rx="12" style="fill:var(--halo)"/><path d="M2 -1 v-4 a5 5 0 0 1 10 0 v4" fill="none" stroke="var(--red)" stroke-width="2.4"/><rect x="0" y="-2" width="14" height="11" rx="2.5" fill="var(--red)"/><text x="22" y="5" class="nostroke" style="fill:var(--red);font-weight:800">락 1개</text></g>
+<g stroke="var(--mute)" stroke-width="2.5"><line x1="150" y1="68" x2="72" y2="116"/><line x1="150" y1="68" x2="228" y2="116"/><line x1="228" y1="116" x2="188" y2="164"/><line x1="228" y1="116" x2="268" y2="164"/></g>
+<rect class="zone" x="166" y="94" width="146" height="124" rx="14" fill="none" stroke="var(--amber)" stroke-width="3" stroke-dasharray="5 4"/>
+<circle cx="150" cy="68" r="14" fill="var(--bk)"/><text class="w" x="150" y="72.5">20</text>
+<circle cx="72" cy="116" r="14" fill="var(--bk)"/><text class="w" x="72" y="120.5">10</text>
+<circle class="toR" cx="228" cy="116" r="14" fill="var(--bk)"/><text class="w" x="228" y="120.5">30</text>
+<circle class="toB" cx="188" cy="164" r="14" fill="var(--red)"/><text class="w" x="188" y="168.5">25</text>
+<circle class="toB" cx="268" cy="164" r="14" fill="var(--red)"/><text class="w" x="268" y="168.5">40</text>
+<g class="nn"><line x1="268" y1="164" x2="294" y2="196" stroke="var(--mute)" stroke-width="2.5"/><circle cx="294" cy="196" r="14" fill="var(--red)"/><text class="w" x="294" y="200.5">45</text></g>
+</svg>
+<p>키 45를 넣으면 부모(40)와 삼촌(25)이 모두 빨강이라 25·30·40의 색이 바뀐다. 큰 트리에서는 이 재색칠과 회전이 뿌리까지 올라갈 수 있다. 어디가 바뀔지 미리 모르니 보통 <b>트리 전체에 락 하나</b>를 건다.</p>
+<p class="small mute" style="margin:0">커널 곳곳에서 쓴다: CFS 런큐, hrtimer, 예전의 VMA 관리.</p>
+</article>
+<article class="card ex">
+<h3><span class="dot" style="background:var(--blue)"></span>skip list: 바뀌는 노드만 잠근다</h3>
+<svg class="sk" viewBox="0 0 320 176" role="img" aria-label="skip list에 키 25를 2층으로 넣을 때 바로 앞 노드인 19와 22만 잠긴다.">
+<line x1="24" y1="56" x2="298" y2="56" style="stroke:color-mix(in srgb,var(--blue) 65%,var(--halo))" stroke-width="5" stroke-linecap="round"/>
+<line x1="24" y1="116" x2="298" y2="116" stroke="var(--slate)" stroke-width="5" stroke-linecap="round"/>
+<line class="nl" x1="120" y1="56" x2="215" y2="56" stroke="var(--amber)" stroke-width="5"/>
+<line class="nl" x1="170" y1="116" x2="215" y2="116" stroke="var(--amber)" stroke-width="5"/>
+<rect x="14" y="42" width="20" height="88" rx="10" fill="var(--ink)"/>
+<rect x="288" y="42" width="20" height="88" rx="10" style="fill:var(--halo)" stroke="var(--mute)" stroke-width="2" stroke-dasharray="4 4"/>
+<line x1="120" y1="56" x2="120" y2="116" stroke="var(--ink)" stroke-width="3"/>
+<line x1="255" y1="56" x2="255" y2="116" stroke="var(--ink)" stroke-width="3"/>
+<g stroke="var(--ink)" stroke-width="3" style="fill:var(--halo)">
+<circle cx="70" cy="116" r="12"/>
+<circle class="hot" cx="120" cy="56" r="12"/><circle cx="120" cy="116" r="12"/>
+<circle class="hot" cx="170" cy="116" r="12"/>
+<circle cx="255" cy="56" r="12"/><circle cx="255" cy="116" r="12"/>
+</g>
+<g class="nn"><line x1="215" y1="56" x2="215" y2="116" stroke="var(--ink)" stroke-width="3"/><circle cx="215" cy="56" r="12" fill="var(--blue)" stroke="var(--ink)" stroke-width="3"/><circle cx="215" cy="116" r="12" fill="var(--blue)" stroke="var(--ink)" stroke-width="3"/></g>
+<g class="lk" transform="translate(113 30)"><path d="M2 -1 v-4 a5 5 0 0 1 10 0 v4" fill="none" stroke="var(--blue)" stroke-width="2.4"/><rect x="0" y="-2" width="14" height="11" rx="2.5" fill="var(--blue)"/></g>
+<g class="lk" transform="translate(163 90)"><path d="M2 -1 v-4 a5 5 0 0 1 10 0 v4" fill="none" stroke="var(--blue)" stroke-width="2.4"/><rect x="0" y="-2" width="14" height="11" rx="2.5" fill="var(--blue)"/></g>
+<g class="key" text-anchor="middle"><text x="70" y="152">7</text><text x="120" y="152">19</text><text x="170" y="152">22</text><text x="215" y="152" style="fill:var(--blue)">25</text><text x="255" y="152">31</text></g>
+</svg>
+<p>키 25를 2층짜리로 넣을 때 바뀌는 포인터는 바로 앞 노드인 19(L1)와 22(L0)뿐이다. <b>그 두 노드만 잠그면</b> 7이나 31 근처에서 일하는 스레드는 기다리지 않는다.</p>
+<p class="small mute" style="margin:0">회전 같은 재균형이 없어서 수정 범위가 좁다. 이게 동시성에서의 장점이다.</p>
+</article>
+</div>
+
+<div id="simWrap" style="margin-top:48px">
+<h3>직접 돌려 보기: 전역 락 vs 노드별 락</h3>
+<div class="ctrl">
+<span class="small mute">스레드 수</span>
+<div class="seg" id="simN" role="group" aria-label="스레드 수"><button type="button" data-n="1" aria-pressed="false">1</button><button type="button" data-n="2" aria-pressed="false">2</button><button type="button" data-n="4" aria-pressed="true">4</button><button type="button" data-n="8" aria-pressed="false">8</button></div>
+<button class="btn" id="simPlay" type="button">일시정지</button>
+<button class="btn" id="simReset" type="button">처음부터</button>
+</div>
+<div class="sim">
+<div class="simp" id="simG"><h4><span class="dot" style="background:var(--red)"></span>rbtree + 전역 락</h4><p class="sub">어느 구간이든 한 번에 한 스레드만 들어간다</p><div class="fig"><canvas aria-label="전역 락 모형: 스레드가 한 번에 하나씩만 구간에 들어간다"></canvas></div><div class="read"><div><b class="ops">0</b> <span>처리한 연산</span></div><div><b class="rate">0.0</b> <span>초당 연산 (모형)</span></div></div></div>
+<div class="simp" id="simF"><h4><span class="dot" style="background:var(--blue)"></span>skip list v2 + 노드별 락</h4><p class="sub">서로 다른 구간이면 동시에 들어간다</p><div class="fig"><canvas aria-label="노드별 락 모형: 서로 다른 구간에는 여러 스레드가 동시에 들어간다"></canvas></div><div class="read"><div><b class="ops">0</b> <span>처리한 연산</span></div><div><b class="rate">0.0</b> <span>초당 연산 (모형)</span></div></div></div>
+</div>
+<p class="verdict" id="simV" aria-live="polite">스레드 4개 · 측정 중</p>
+<p class="small mute" style="margin:0">개념을 보여 주는 모형이다. 연산 시간은 임의로 정했고, skip list는 포인터를 더 따라가므로 한 번이 조금 더 오래 걸리게 했다. 그래서 스레드 1개에서는 rbtree가 앞선다. 실제 수치는 실험으로 잰다.</p>
+</div>
+</div></section>
+
+<section class="band" id="lineup"><div class="wrap">
+<div class="sh"><h2>구현 5개를 같은 측정 틀에서 잰다</h2>
+<p>발표의 줄거리는 세 정거장이다. 전부 잠그는 rbtree, 읽기만 락 없이 하는 maple tree, 쓰기까지 동시에 하는 skip list v2. 나머지 둘은 공정한 비교를 위한 기준이다.</p></div>
+<div class="story">
+<div class="stn" style="color:var(--red)"><i></i><b>rbtree + 락</b><span>전부 잠금</span></div>
+<div class="stn" style="color:var(--green)"><i></i><b>maple tree</b><span>읽기만 락 없음</span></div>
+<div class="stn" style="color:var(--blue)"><i></i><b>skip list v2</b><span>쓰기도 동시</span></div>
+<span class="tok" aria-hidden="true"></span>
+</div>
+<div class="scroll"><table class="stack">
+<thead><tr><th>구현</th><th>읽기끼리 동시</th><th>쓰기끼리 동시</th><th>이 비교에서 맡는 역할</th><th>담당</th></tr></thead>
+<tbody>
+<tr><td><span class="nm"><span class="dot" style="background:var(--red)"></span>rbtree + spinlock</span></td><td><span class="n">안 됨</span></td><td><span class="n">안 됨</span></td><td>기준선. 커널이 보통 쓰는 방식</td><td>A</td></tr>
+<tr><td><span class="nm"><span class="dot" style="background:var(--red)"></span>rbtree + rwlock</span></td><td><span class="y">됨</span></td><td><span class="n">안 됨</span></td><td>탐색 위주 조건에서 공정한 기준</td><td>A</td></tr>
+<tr><td><span class="nm"><span class="dot" style="background:var(--slate)"></span>skip list v1 (락 1개)</span></td><td><span class="n">안 됨</span></td><td><span class="n">안 됨</span></td><td>대조군. rbtree와 락은 같고 구조만 다름</td><td>B</td></tr>
+<tr><td><span class="nm"><span class="dot" style="background:var(--green)"></span>maple tree</span></td><td><span class="y">됨 (RCU)</span></td><td><span class="n">안 됨 (락 1개)</span></td><td>커널의 최신 답. 6.1부터 VMA 관리에 쓴다</td><td>D</td></tr>
+<tr class="core"><td><span class="nm"><span class="dot" style="background:var(--blue)"></span>skip list v2 (노드별 락) <span class="star">핵심</span></span></td><td><span class="y">됨 (락 없이)</span></td><td><span class="y">됨 (다른 구간이면)</span></td><td>우리의 기여</td><td>C</td></tr>
+</tbody></table></div>
+<p class="small mute" style="margin-top:10px">v3(RCU로 탐색하는 skip list)는 여유가 있을 때만 D가 시도한다.</p>
+<div class="g2" style="margin-top:24px">
+<div class="card"><h3>v1이 왜 필요한가</h3><p style="margin-top:8px">속도 차이가 자료구조 때문인지 락 때문인지 나눠서 말하기 위해서다.</p>
+<div class="pairs">
+<div class="pair"><span class="chip"><span class="dot" style="background:var(--red)"></span>rbtree</span><span class="mute">↔</span><span class="chip"><span class="dot" style="background:var(--slate)"></span>v1</span><span>락은 같고 구조만 다름 → <b>자료구조 효과</b></span></div>
+<div class="pair"><span class="chip"><span class="dot" style="background:var(--slate)"></span>v1</span><span class="mute">↔</span><span class="chip"><span class="dot" style="background:var(--blue)"></span>v2</span><span>구조는 같고 락만 다름 → <b>락 효과</b></span></div>
+</div></div>
+<div class="card"><h3>maple tree를 왜 넣었나</h3><p style="margin-top:8px">커널은 6.1부터 메모리 영역(VMA) 관리를 rbtree에서 maple tree로 바꿨다. 바로 이 확장성 문제 때문이다. 그런데 maple tree도 쓰기는 락 하나로 줄을 선다.</p><p style="margin:0">그래서 "옛날 방식인 rbtree만 이긴 것 아니냐"는 질문을 막고, v2의 차별점을 <b>쓰기도 동시에 된다</b>로 좁힐 수 있다.</p></div>
+</div>
+</div></section>
+
+<section class="band alt" id="prove"><div class="wrap">
+<div class="sh"><h2>증명하고 싶은 것: 쓰기가 섞이면 v2만 계속 오른다</h2>
+<p>"skip list가 무조건 빠르다"가 아니다. 어떤 조건에서 왜 이기고 왜 지는지를 데이터로 설명하는 게 목표다. 아래 그래프는 가설을 그림으로 옮긴 예상 모양이다.</p></div>
+<div class="cw">
+<div class="card">
+<div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;margin-bottom:12px"><h3 id="chartTitle">쓰기가 절반이면 v2만 계속 오른다</h3><span class="tag">예상 · 실측 아님</span></div>
+<div class="seg" id="mixSeg" role="group" aria-label="작업 비율"><button type="button" data-m="r" aria-pressed="false">탐색만</button><button type="button" data-m="a" aria-pressed="false">90·5·5</button><button type="button" data-m="b" aria-pressed="true">50·25·25</button><button type="button" data-m="c" aria-pressed="false">0·50·50</button></div>
+<p class="small mute" style="margin:8px 0 0">비율은 탐색 · 삽입 · 삭제 순서다.</p>
+<div class="fig" id="chart"><svg role="img" aria-label="스레드 수에 따른 구현별 예상 처리량 그래프"></svg></div>
+</div>
+<div>
+<ol class="hyp">
+<li><span class="h">1</span><div><b>확장성</b>스레드를 1개에서 8개로 늘리면 v2 처리량이 오른다. rbtree + spinlock은 거의 평평하다.</div></li>
+<li><span class="h">2</span><div><b>쓰기 동시성</b>쓰기 비율이 높을수록 v2와 maple tree의 차이가 벌어진다. 왼쪽 버튼으로 비율을 바꿔 보면 보인다.</div></li>
+<li><span class="h">3</span><div><b>범위 탐색</b>스캔이 도는 동안 rbtree는 쓰기가 멈추고, v2는 계속 쓴다.</div></li>
+<li><span class="h">4</span><div><b>정직한 예상</b>스레드 1개에서는 rbtree가 이긴다. skip list가 포인터를 더 많이 따라가기 때문이다.</div></li>
+</ol>
+<div class="card" style="margin-top:20px"><h4>가설이 맞았다고 말할 기준</h4><p style="margin:8px 0 0">쓰기가 섞인 조건에서 스레드가 늘수록 v2가 rbtree와 maple tree를 앞서면 성립한다. 지는 조건이 나와도 그것 역시 결과다. 이동 노드 수와 재시도 횟수로 이유를 붙인다.</p></div>
+</div>
+</div>
+<div class="g2" style="margin-top:20px">
+<div class="card"><h3>가설 3 · 스캔 중에도 쓸 수 있나</h3><p class="small mute" style="margin:6px 0 0">스캔 스레드 하나가 맨 아래층을 훑는 동안, 쓰기 스레드 셋이 빈 자리(점선)에 키를 넣으려 한다.</p>
+<div class="fig" id="scanFig"><canvas aria-label="범위 탐색 모형: rbtree는 스캔이 끝날 때까지 쓰기가 기다리고, v2는 스캔 중에도 쓴다"></canvas></div>
+<p class="small mute" style="margin:0">rbtree는 스캔이 락을 쥐고 있어서 쓰기가 스캔이 끝날 때까지 기다린다. rwlock이어도 스캔이 읽기 락을 잡으므로 쓰기는 막힌다.</p></div>
+<div class="card"><h3>가설 4 · 1스레드에서 왜 지나</h3><p class="small mute" style="margin:6px 0 0">키 하나를 찾을 때 따라가는 노드 수의 이론 기댓값이다. 대략적인 값이고, skip list는 p = 1/2 기준이다.</p>
+<div id="hops">
+<div class="hgrp"><div class="hl">원소 1만 개</div>
+<div class="hrow"><span>rbtree</span><span class="track"><span class="bar" style="width:33%;background:var(--red)"></span></span><span class="hv">약 13칸</span></div>
+<div class="hrow"><span>skip list</span><span class="track"><span class="bar" style="width:67%;background:var(--blue)"></span></span><span class="hv">약 27칸</span></div></div>
+<div class="hgrp"><div class="hl">원소 10만 개</div>
+<div class="hrow"><span>rbtree</span><span class="track"><span class="bar" style="width:42%;background:var(--red)"></span></span><span class="hv">약 17칸</span></div>
+<div class="hrow"><span>skip list</span><span class="track"><span class="bar" style="width:83%;background:var(--blue)"></span></span><span class="hv">약 33칸</span></div></div>
+<div class="hgrp"><div class="hl">원소 100만 개</div>
+<div class="hrow"><span>rbtree</span><span class="track"><span class="bar" style="width:50%;background:var(--red)"></span></span><span class="hv">약 20칸</span></div>
+<div class="hrow"><span>skip list</span><span class="track"><span class="bar" style="width:100%;background:var(--blue)"></span></span><span class="hv">약 40칸</span></div></div>
+</div>
+<p class="small mute" style="margin:0">skip list는 평균 2배쯤 더 따라간다. 노드마다 캐시 미스가 날 수 있어서, 스레드가 1개면 이 차이가 그대로 시간 차이가 된다. 실제 값은 이동 노드 수 카운터로 잰다.</p></div>
+</div>
+</div></section>
+
+<section class="band" id="exp"><div class="wrap">
+<div class="sh"><h2>실험: 변수 3개를 조합하고, 범위 탐색은 따로 잰다</h2>
+<p>모든 구현을 같은 VM, 같은 조건에서 돌린다. VM이라 값이 흔들리므로 조건마다 5번 반복해 평균과 편차를 낸다.</p></div>
+<div class="vars">
+<div class="card"><h4>원소 수</h4><div class="chips"><span class="chip">1만</span><span class="chip">10만</span><span class="chip">100만</span></div></div>
+<div class="card"><h4>스레드 수</h4><div class="chips"><span class="chip">1</span><span class="chip">2</span><span class="chip">4</span><span class="chip">8</span></div><p class="small mute" style="margin:10px 0 0">VM의 vCPU 수까지만 늘린다</p></div>
+<div class="card"><h4>작업 비율 (탐색·삽입·삭제)</h4><div class="chips"><span class="chip">100·0·0</span><span class="chip">90·5·5</span><span class="chip">50·25·25</span><span class="chip">0·50·50</span></div></div>
+</div>
+<div class="figs">
+<div class="big"><b>48</b><span>조건 (3 × 4 × 4)</span></div>
+<div class="big"><b>1,200</b><span>번 실행 (구현 5개 × 반복 5번)</span></div>
+<div class="big"><b>약 1시간</b><span>한 번에 3초씩 돌릴 때</span></div>
+<div class="big"><b>+1</b><span>범위 탐색 실험: 스캔 1 + 쓰기 1·2·4, 스캔 길이 100·1,000</span></div>
+</div>
+<div class="g2">
+<div class="card"><h3>재는 값</h3><ul style="margin-top:10px">
+<li><b>처리량</b> (ops/s): 모든 그래프의 주인공</li>
+<li><b>평균 지연</b> (ns/연산)</li>
+<li><b>이동 노드 수</b> (연산당): 1스레드 분석용 카운터</li>
+<li><b>재시도 횟수</b>: v2의 검증 실패. 경합이 얼마나 심한지 보여 준다</li>
+<li><b>노드당 메모리</b> (선택): 노드별 락과 포인터 배열의 비용</li>
+</ul><p class="small mute" style="margin:10px 0 0">카운터는 컴파일 옵션으로 켠다. 처리량을 잴 때는 끈다.</p></div>
+<div class="card"><h3>처음 계획에서 바꾼 점</h3><ul style="margin-top:10px">
+<li><b>"삽입만" 조건을 뺐다.</b> 키 범위가 정해져 있어 금방 다 차고, 그 뒤 삽입은 "이미 있음"으로 실패한다. 결국 탐색을 재게 된다.</li>
+<li><b>삽입과 삭제를 같은 비율로 섞는다.</b> 원소 수가 일정하게 유지되고, 과제 요건인 삭제 성능도 함께 잰다.</li>
+<li><b>범위 탐색을 넣었다.</b> 과제 요건인 순회(traverse)를 재고, 락 범위 차이가 가장 크게 드러난다.</li>
+<li><b>스레드를 8개까지 늘렸다.</b> 4개까지로는 확장성 곡선이 약하다.</li>
+</ul></div>
+</div>
+</div></section>
+
+<section class="band alt" id="arch"><div class="wrap">
+<div class="sh"><h2>구조: 측정 틀 하나에 구현을 끼운다</h2>
+<p>모듈 하나는 측정 틀(harness)과 구현 하나를 묶은 것이다. 예를 들어 bench_rb.ko는 harness.o와 rbtree_lock.o로 만든다. 공통 함수 묶음 ds_ops만 맞추면 각자 따로 개발하고 나중에 그대로 끼운다.</p></div>
+<div class="card"><div class="scroll">
+<svg class="archsvg" viewBox="0 0 960 330" role="img" aria-label="측정 틀이 ds_ops를 통해 다섯 구현을 똑같이 호출하는 구조도" style="color:var(--ink)">
+<defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10z" fill="currentColor"/></marker></defs>
+<rect x="20" y="14" width="920" height="80" rx="14" fill="var(--bk)"/>
+<text x="44" y="46" class="nostroke" style="fill:#fff;font-size:17px;font-weight:800">측정 틀 (harness) · A</text>
+<text x="44" y="74" class="nostroke" style="fill:#c9d1dc">모듈 파라미터 → 미리 채우기 → kthread N개 동시 출발 → ktime_get_ns()로 시간 측정 → RESULT 한 줄 출력</text>
+<line x1="480" y1="94" x2="480" y2="126" stroke="currentColor" stroke-width="2.5" marker-end="url(#ah)"/>
+<text x="494" y="116" class="lvl">bench_ds.insert / search / remove / range 호출</text>
+<rect x="330" y="130" width="300" height="48" rx="12" fill="var(--amber)"/>
+<text x="480" y="160" text-anchor="middle" class="nostroke" style="fill:var(--onamber);font-family:'JetBrains Mono',monospace;font-size:16px;font-weight:600">struct ds_ops</text>
+<g fill="none" stroke="currentColor" stroke-width="2.5"><path d="M480 178 V204"/><path d="M114 204 H846"/><path d="M114 204 V226"/><path d="M297 204 V226"/><path d="M480 204 V226"/><path d="M663 204 V226"/><path d="M846 204 V226"/></g>
+<rect x="30" y="230" width="168" height="78" rx="12" style="fill:var(--halo)" stroke="var(--red)" stroke-width="3"/>
+<rect x="213" y="230" width="168" height="78" rx="12" style="fill:var(--halo)" stroke="var(--slate)" stroke-width="3"/>
+<rect x="396" y="230" width="168" height="78" rx="12" style="fill:var(--halo)" stroke="var(--green)" stroke-width="3"/>
+<rect x="579" y="230" width="168" height="78" rx="12" style="fill:var(--halo)" stroke="var(--blue)" stroke-width="5"/>
+<rect x="762" y="230" width="168" height="78" rx="12" style="fill:var(--halo)" stroke="var(--mute)" stroke-width="2" stroke-dasharray="6 5"/>
+<g text-anchor="middle">
+<text x="114" y="263" style="font-size:15px;font-weight:800">rbtree + 락</text><text x="114" y="288" class="lvl">A · bench_rb.ko</text>
+<text x="297" y="263" style="font-size:15px;font-weight:800">skip list v1</text><text x="297" y="288" class="lvl">B · bench_sl1.ko</text>
+<text x="480" y="263" style="font-size:15px;font-weight:800">maple tree</text><text x="480" y="288" class="lvl">D · bench_mt.ko</text>
+<text x="663" y="263" style="font-size:15px;font-weight:800;fill:var(--blue)">skip list v2</text><text x="663" y="288" class="lvl">C · bench_sl2.ko</text>
+<text x="846" y="263" style="font-size:15px;font-weight:800;fill:var(--mute)">v3 RCU (선택)</text><text x="846" y="288" class="lvl">D · bench_rcu.ko</text>
+</g>
+</svg></div>
+<p class="small mute" style="margin:10px 0 0">결과는 CSV로 모으고, D가 그래프로 만든다.</p></div>
+<div class="g2" style="margin-top:20px">
+<div><h3 style="margin-bottom:10px">ds_ops: range 한 줄을 추가한다</h3>
+<div class="cwrap"><button class="copy" type="button" data-t="#dsops">복사</button><pre><code id="dsops">struct ds_ops {
+	const char *name;
+	int  (*init)(void);
+	int  (*insert)(u64 key);        /* 0 | -EEXIST | -ENOMEM */
+	bool (*search)(u64 key);
+	int  (*remove)(u64 key);        /* 0 | -ENOENT */
+	u64  (*range)(u64 lo, u64 hi);  /* 추가: [lo, hi] 안의 키 개수 */
+	void (*destroy)(void);
+};</code></pre></div>
+<p class="small mute" style="margin-top:8px">반환값 규칙은 제안이다. 첫 회의에서 확정한다.</p></div>
+<div><h3 style="margin-bottom:6px">측정 틀 파라미터 (제안)</h3>
+<div class="scroll"><table class="stack"><thead><tr><th>이름</th><th>값</th><th>뜻</th></tr></thead><tbody>
+<tr><td><code>nthreads</code></td><td>1 · 2 · 4 · 8</td><td>워커 스레드 수</td></tr>
+<tr><td><code>nkeys</code></td><td>1만 · 10만 · 100만</td><td>미리 채울 원소 수</td></tr>
+<tr><td><code>search_pct</code> <code>insert_pct</code></td><td>0~100</td><td>삭제 비율은 나머지</td></tr>
+<tr><td><code>scan_threads</code></td><td>0 · 1</td><td>범위 탐색 스레드 수</td></tr>
+<tr><td><code>scan_len</code></td><td>100 · 1,000</td><td>한 번에 훑는 키 범위</td></tr>
+<tr><td><code>duration_ms</code></td><td>3000</td><td>측정 시간</td></tr>
+</tbody></table></div>
+<p class="small" style="margin-top:12px">결과는 한 줄로 출력하고 D가 파싱한다.<br><code>RESULT,ds,threads,nkeys,search,insert,remove,scan,ops,elapsed_ns</code></p></div>
+</div>
+</div></section>
+
+<section class="band" id="study"><div class="wrap">
+<div class="sh"><h2>공부할 것: 모두 같이 7가지, 그다음 자기 노선</h2>
+<p>공통 7가지는 모두가 설명할 수 있어야 한다. 짝이 빠져도 그 부분을 대신 설명할 수 있게 하는 게 기준이다.</p></div>
+<div class="g2" style="align-items:start;gap:clamp(24px,4vw,56px)">
+<div><h3 style="margin-bottom:18px">모두 공통</h3>
+<ol class="stl">
+<li><b>커널 모듈 기초</b><span>module_init/exit, insmod · rmmod, pr_info와 dmesg, Makefile의 obj-m. 4주차 과제 복습이면 충분하다.</span></li>
+<li><b>커널 스레드</b><span>kthread_run, kthread_stop, completion으로 기다리기. LKD 3장.</span></li>
+<li><b>스핀락과 rwlock</b><span>스핀락을 쥔 채로 잠들면 안 되는 이유. LKD 9~10장.</span></li>
+<li><b>커널 rbtree API</b><span>내 구조체에 rb_node 넣기, rb_link_node · rb_insert_color · rb_erase. Documentation/core-api/rbtree.rst, LKD 6장.</span></li>
+<li><b>skip list 원리</b><span>층 수는 동전 던지기로 정한다. 위층에서 건너뛰고 넘치면 내려간다. 평균 O(log n). Pugh 1990.</span></li>
+<li><b>동시성 기본</b><span>경쟁 조건, 교착 상태, 락을 잡는 순서. READ_ONCE가 왜 필요한지 정도까지.</span></li>
+<li><b>Git PR 흐름</b><span>feat/ 브랜치 → PR → 강성준이 확인·approve → merge. 체크리스트는 PR 템플릿에 있다.</span></li>
+</ol></div>
+<div class="rsl"><h3 style="margin-bottom:4px">역할별</h3>
+<div class="card"><h4><span class="dot" style="background:var(--red)"></span>A 강성준 · 측정 틀</h4><ul>
+<li>module_param으로 파라미터 받기</li>
+<li>kthread_bind로 CPU 고정, completion으로 동시 출발과 종료 대기</li>
+<li>ktime_get_ns, 스레드별 prandom_u32_state</li>
+<li>false sharing과 ____cacheline_aligned</li></ul></div>
+<div class="card"><h4><span class="dot" style="background:var(--slate)"></span>B 이은찬 · v1과 검증</h4><ul>
+<li>유연 배열 멤버로 층 수만큼만 할당하기</li>
+<li>random_level: 난수 하나로 층 수 정하기</li>
+<li>불변식 3가지와 스트레스 테스트 설계</li>
+<li>캐시와 포인터 추적 (1스레드 분석용)</li></ul></div>
+<div class="card"><h4><span class="dot" style="background:var(--blue)"></span>C 이우신 · v2</h4><ul>
+<li>Herlihy 외 2007 lazy skip list 논문, The Art of Multiprocessor Programming 14장</li>
+<li>READ_ONCE · WRITE_ONCE, smp_store_release · smp_load_acquire (memory-barriers.txt)</li>
+<li>ARM64가 x86보다 메모리 접근 순서를 자유롭게 바꾸는 이유</li>
+<li>락 순서(아래층 → 위층), cpu_relax로 기다리기</li></ul></div>
+<div class="card"><h4><span class="dot" style="background:var(--green)"></span>D 종주원 · 실험과 maple tree</h4><ul>
+<li>maple tree API: mtree_insert · mtree_load · mtree_erase · mt_for_each (core-api/maple_tree.rst)</li>
+<li>RCU 기초 (RCU/whatisRCU.rst)</li>
+<li>셸 자동화: dmesg -C, set -e, rmmod 실패 확인</li>
+<li>matplotlib 오차 막대, 관련 연구 정리</li></ul></div>
+</div>
+</div>
+</div></section>
+
+<section class="band alt" id="roles"><div class="wrap">
+<div class="sh"><h2>역할: 각자 자기 노선 하나</h2>
+<p>사람마다 색이 곧 자기 구현의 색이다. 모든 PR은 강성준이 확인하고, 강성준의 PR은 이은찬이 확인한다. 백업 짝(강성준 ↔ 이은찬, 이우신 ↔ 종주원)은 서로의 파트를 설명할 수 있게 유지한다.</p></div>
+<div class="roles">
+<article class="role" style="--c:var(--red)">
+<div class="rh"><span class="rl">A</span><div><h3>강성준 · PM</h3><p>측정 틀 + 기준 구현 rbtree</p></div></div>
+<ul>
+<li>PM: 첫 회의 진행, 저장소와 브랜치 보호, 주 1회 15분 점검</li>
+<li><b>모든 PR 확인과 merge</b> (내 PR은 이은찬이 확인)</li>
+<li>측정 틀: 파라미터, 미리 채우기, kthread N개 동시 출발, 1~8 스레드와 CPU 고정</li>
+<li>부하: 탐색·삽입·삭제 비율 섞기, 범위 탐색 스레드</li>
+<li>rbtree + spinlock / rwlock, range 포함</li>
+<li>모든 구현 통합, 정합성 테스트 실행</li>
+</ul>
+<dl class="rk"><dt>산출물</dt><dd><code>harness/harness.c</code> <code>ds/rbtree_lock.c</code> <code>Makefile</code></dd><dt>완료 기준</dt><dd>bench_rb.ko가 1·2·4·8 스레드에서 RESULT를 출력하고, 같은 조건 5번의 편차가 10% 안팎이며, rmmod 후 누수가 없다</dd><dt>발표</dt><dd>실험 환경과 방법</dd></dl>
+</article>
+<article class="role" style="--c:var(--slate)">
+<div class="rh"><span class="rl">B</span><div><h3>이은찬</h3><p>skip list v1 + 정합성 검증</p></div></div>
+<ul>
+<li>노드 구조체를 설계해 C와 공유한다</li>
+<li>random_level, insert · search · remove · range + 락 1개</li>
+<li>검사 함수: L0 오름차순, 층 포함 관계, 개수 일치, range 결과 = 실제 개수</li>
+<li>스트레스 테스트: 겹치지 않는 키, 같은 키를 여러 스레드가 동시에</li>
+<li>C와 페어로 v2 리뷰와 디버깅, 1스레드 분석</li>
+</ul>
+<dl class="rk"><dt>산출물</dt><dd><code>ds/skiplist_v1.c</code> <code>tests/</code></dd><dt>완료 기준</dt><dd>v1이 검사 함수를 통과하고, 스트레스 테스트가 모든 구현에 돌아간다</dd><dt>발표</dt><dd>skip list 개념, 1스레드에서 지는 이유</dd></dl>
+</article>
+<article class="role" style="--c:var(--blue)">
+<div class="rh"><span class="rl">C</span><div><h3>이우신 <span class="star">핵심</span></h3><p>skip list v2 · 노드별 락</p></div></div>
+<ul>
+<li>lazy skip list 의사코드를 우리 구조체 기준으로 다시 쓴다</li>
+<li>락 순서(아래층 → 위층)와 메모리 순서 규칙을 문서로 남긴다</li>
+<li>탐색 → 삽입 → 삭제 순서로 구현, 삭제한 노드는 지연 해제</li>
+<li>range: 맨 아래층을 락 없이 따라가기, 검증 실패 재시도 카운터</li>
+<li>다른 일은 맡지 않는다</li>
+</ul>
+<dl class="rk"><dt>산출물</dt><dd><code>ds/skiplist_v2.c</code> <code>docs/v2-design.md</code></dd><dt>완료 기준</dt><dd>같은 키가 겹치는 스트레스 테스트를 10번 연속 통과하고, 개수가 v1과 일치한다</dd><dt>발표</dt><dd>v2 설계: 락 범위, 검증, 지연 해제</dd></dl>
+</article>
+<article class="role" style="--c:var(--green)">
+<div class="rh"><span class="rl">D</span><div><h3>종주원</h3><p>실험 · 분석 · 발표 총괄 + maple tree</p></div></div>
+<ul>
+<li>run_bench.sh: 조건 순회 → insmod → RESULT 추출 → rmmod → CSV</li>
+<li>plot.py: 스레드 수별 처리량, 평균 ± 편차 오차 막대</li>
+<li>maple tree 구현: mtree_insert · load · erase, range는 mt_for_each</li>
+<li>관련 연구: Pugh, Herlihy, 커널의 maple tree 전환</li>
+<li>발표 흐름과 리허설, (선택) v3 RCU</li>
+</ul>
+<dl class="rk"><dt>산출물</dt><dd><code>scripts/</code> <code>ds/maple.c</code> <code>results/</code> 슬라이드</dd><dt>완료 기준</dt><dd>스크립트 한 번 실행으로 전체 측정, CSV, 그래프가 나온다</dd><dt>발표</dt><dd>도입, 관련 연구, 결과, 결론</dd></dl>
+</article>
+</div>
+<div class="card" style="margin-top:24px"><h3>발표 10분 배분</h3>
+<div class="pres">
+<div class="pr"><span>문제 제기: 전역 락의 한계와 가설<span class="who"><i class="dot" style="background:var(--green)"></i></span></span><span class="track"><span class="bar" style="width:40%;background:var(--ink)"></span></span><span class="hv">1:00</span></div>
+<div class="pr"><span>배경: rbtree, skip list, maple tree<span class="who"><i class="dot" style="background:var(--slate)"></i><i class="dot" style="background:var(--green)"></i></span></span><span class="track"><span class="bar" style="width:60%;background:var(--ink)"></span></span><span class="hv">1:30</span></div>
+<div class="pr"><span>설계: v1 → v2<span class="who"><i class="dot" style="background:var(--blue)"></i></span></span><span class="track"><span class="bar" style="width:100%;background:var(--blue)"></span></span><span class="hv">2:30</span></div>
+<div class="pr"><span>실험 환경과 방법<span class="who"><i class="dot" style="background:var(--red)"></i></span></span><span class="track"><span class="bar" style="width:40%;background:var(--ink)"></span></span><span class="hv">1:00</span></div>
+<div class="pr"><span>결과: 스레드 수별, 작업 비율별<span class="who"><i class="dot" style="background:var(--green)"></i></span></span><span class="track"><span class="bar" style="width:80%;background:var(--ink)"></span></span><span class="hv">2:00</span></div>
+<div class="pr"><span>분석: 왜 이기고 왜 지나, 한계<span class="who"><i class="dot" style="background:var(--slate)"></i><i class="dot" style="background:var(--blue)"></i></span></span><span class="track"><span class="bar" style="width:60%;background:var(--ink)"></span></span><span class="hv">1:30</span></div>
+<div class="pr"><span>결론<span class="who"><i class="dot" style="background:var(--green)"></i></span></span><span class="track"><span class="bar" style="width:20%;background:var(--ink)"></span></span><span class="hv">0:30</span></div>
+</div></div>
+</div></section>
+
+<section class="band" id="bottleneck"><div class="wrap">
+<div class="sh"><h2>병목: 누군가를 기다려야 하는 곳은 여섯 군데</h2>
+<p>날짜 대신 순서로 그렸다. 노란 띠가 가장 긴 대기 줄(임계 경로)이고, 이 줄 위의 일이 늦으면 프로젝트 전체가 늦는다. 나머지는 각자 작은 테스트 모듈로 혼자 검증하며 동시에 진행한다.</p></div>
+<div class="scroll">
+<svg class="bnsvg" id="bnSvg" viewBox="0 0 1000 370" role="img" aria-label="역할별 작업 노선도. ds_ops 합의에서 출발해 v2 구현, 통합, 최종 측정, 발표로 이어지는 임계 경로와 병목 여섯 곳을 표시했다." style="color:var(--ink)">
+<defs><marker id="ah2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10z" fill="var(--mute)"/></marker></defs>
+<path d="M170 240 H640 V200 H940" fill="none" stroke="var(--amber)" stroke-width="26" stroke-linecap="round" stroke-linejoin="round" opacity=".42"/>
+<g fill="none" stroke-width="8" stroke-linecap="round" stroke-linejoin="round">
+<path d="M190 80 H570 L610 120 H640" stroke="var(--red)"/>
+<path d="M190 160 H640" stroke="var(--slate)"/>
+<path d="M190 240 H640" stroke="var(--blue)"/>
+<path d="M190 320 H570 L610 280 H640" stroke="var(--green)"/>
+<path d="M660 200 H940" stroke="var(--ink)"/>
+</g>
+<path d="M320 94 V306" fill="none" stroke="var(--mute)" stroke-width="2" stroke-dasharray="5 5"/>
+<path d="M480 174 V222" fill="none" stroke="var(--mute)" stroke-width="2" stroke-dasharray="5 5" marker-end="url(#ah2)"/>
+<rect x="150" y="56" width="40" height="288" rx="20" style="fill:var(--halo)" stroke="var(--ink)" stroke-width="5"/>
+<rect x="620" y="106" width="40" height="188" rx="20" style="fill:var(--halo)" stroke="var(--ink)" stroke-width="5"/>
+<g stroke-width="5" style="fill:var(--halo)">
+<circle cx="320" cy="80" r="12" stroke="var(--red)"/><circle cx="480" cy="80" r="12" stroke="var(--red)"/>
+<circle cx="320" cy="160" r="12" stroke="var(--slate)"/><circle cx="480" cy="160" r="12" stroke="var(--slate)"/>
+<circle cx="320" cy="240" r="12" stroke="var(--blue)"/><circle cx="480" cy="240" r="12" stroke="var(--blue)"/>
+<circle cx="320" cy="320" r="12" stroke="var(--green)"/><circle cx="480" cy="320" r="12" stroke="var(--green)"/>
+<circle cx="800" cy="200" r="14" stroke="var(--ink)"/><circle cx="940" cy="200" r="14" stroke="var(--ink)"/>
+</g>
+<circle cx="26" cy="80" r="9" fill="var(--red)"/><text x="42" y="85">A 강성준</text>
+<circle cx="26" cy="160" r="9" fill="var(--slate)"/><text x="42" y="165">B 이은찬</text>
+<circle cx="26" cy="240" r="9" fill="var(--blue)"/><text x="42" y="245">C 이우신</text>
+<circle cx="26" cy="320" r="9" fill="var(--green)"/><text x="42" y="325">D 종주원</text>
+<g text-anchor="middle">
+<text x="170" y="32" style="font-weight:800">ds_ops 합의 (전원)</text>
+<text x="320" y="111">측정 틀 (더미부터)</text><text x="480" y="111">rbtree</text>
+<text x="320" y="191">v1</text><text x="480" y="191">정합성 검사</text>
+<text x="320" y="271">v2 설계</text><text x="480" y="271" style="font-weight:800">v2 구현·안정화</text>
+<text x="320" y="351">실험 스크립트</text><text x="480" y="351">maple tree</text>
+<text x="640" y="318">통합·PR 확인 (A)</text>
+<text x="800" y="233">최종 측정 (VM 1대)</text><text x="940" y="233">그래프·발표</text>
+</g>
+<text x="332" y="135" class="lvl">harness에 끼워 돌림</text>
+<text x="470" y="212" class="lvl" text-anchor="end">검사 함수</text>
+<g fill="none" stroke="var(--amber)" stroke-width="3">
+<circle class="pulse" cx="170" cy="56" r="13"/><circle class="pulse" cx="336" cy="64" r="13"/><circle class="pulse" cx="496" cy="224" r="16" style="animation-duration:1.4s"/><circle class="pulse" cx="496" cy="144" r="13"/><circle class="pulse" cx="640" cy="106" r="13"/><circle class="pulse" cx="816" cy="184" r="13"/>
+</g>
+<g stroke="var(--ink)" stroke-width="2" fill="var(--amber)">
+<circle cx="170" cy="56" r="13"/><circle cx="336" cy="64" r="13"/><circle cx="496" cy="224" r="16"/><circle cx="496" cy="144" r="13"/><circle cx="640" cy="106" r="13"/><circle cx="816" cy="184" r="13"/>
+</g>
+<g text-anchor="middle" class="nostroke" style="font-weight:800">
+<text x="170" y="61" class="nostroke" style="fill:var(--onamber);font-weight:800">1</text>
+<text x="336" y="69" class="nostroke" style="fill:var(--onamber);font-weight:800">2</text>
+<text x="496" y="229" class="nostroke" style="fill:var(--onamber);font-weight:800;font-size:15px">3</text>
+<text x="496" y="149" class="nostroke" style="fill:var(--onamber);font-weight:800">4</text>
+<text x="640" y="111" class="nostroke" style="fill:var(--onamber);font-weight:800">5</text>
+<text x="816" y="189" class="nostroke" style="fill:var(--onamber);font-weight:800">6</text>
+</g>
+<circle id="bnTok" r="8" fill="var(--amber)" stroke="var(--ink)" stroke-width="3"><animateMotion dur="7s" repeatCount="indefinite" path="M170 240 H640 V200 H940"/></circle>
+</svg></div>
+<p class="legend"><span class="sw"><i style="background:var(--amber);opacity:.6;height:10px"></i>임계 경로</span><span class="sw"><i style="background:var(--amber);width:14px;height:14px;border-radius:50%"></i>병목 번호</span><span class="sw"><i style="height:0;border-top:2px dashed var(--mute);border-radius:0"></i>의존 관계</span><span class="phone-only">좁은 화면에서는 그림을 옆으로 밀어서 본다.</span></p>
+<div class="bns">
+<div class="bn"><span class="num">1</span><div><h4>ds_ops 합의 <span class="sev h">높음 · 짧음</span></h4><dl><dt>왜 막히나</dt><dd>인터페이스가 정해져야 각자 코드를 쓰기 시작할 수 있다.</dd><dt>기다리는 사람</dt><dd>전원</dd><dt>푸는 법</dt><dd>회의 한 번에 시그니처뿐 아니라 규칙(반환값, 키 범위, range의 의미)까지 확정한다. 아래 안건을 그대로 쓴다.</dd></dl></div></div>
+<div class="bn"><span class="num">2</span><div><h4>측정 틀 (A) <span class="sev h">높음</span></h4><dl><dt>왜 막히나</dt><dd>v1·v2·maple tree 모두 harness에 끼워야 돌려 볼 수 있고, D의 스크립트도 harness 출력을 읽는다.</dd><dt>기다리는 사람</dt><dd>B, C, D</dd><dt>푸는 법</dt><dd>A가 아무 일도 안 하는 더미 구현으로 harness를 먼저 올린다. 기능은 삽입·탐색 → 삭제 섞기 → 스캔 스레드 순서로 덧붙인다. 그동안 다른 사람은 각자 작은 테스트 모듈로 혼자 검증한다.</dd></dl></div></div>
+<div class="bn max"><span class="num">3</span><div><h4>v2 구현·안정화 (C) <span class="sev x">가장 큼</span></h4><dl><dt>왜 막히나</dt><dd>가장 어렵고, 핵심 결과와 최종 측정이 전부 v2를 기다린다.</dd><dt>기다리는 사람</dt><dd>최종 측정, 발표의 결과 파트</dd><dt>푸는 법</dt><dd>구현 전에 의사코드와 락 순서 문서를 B와 리뷰한다. 탐색 → 삽입 → 삭제 순서로 작은 PR을 올린다. C에게 다른 일을 얹지 않는다. 끝내 불안정하면 v1 결과 + v2 설계·부분 결과 + 막힌 이유 분석으로 발표한다.</dd></dl></div></div>
+<div class="bn"><span class="num">4</span><div><h4>정합성 검사 함수 (B) <span class="sev m">중간</span></h4><dl><dt>왜 막히나</dt><dd>v2 스트레스 테스트가 이 함수로 통과 여부를 판정한다.</dd><dt>기다리는 사람</dt><dd>C</dd><dt>푸는 법</dt><dd>B가 노드 구조체와 검사 함수부터 공개한다. v1이 완성되기 전이어도 된다. C는 같은 뼈대 위에 필드만 추가한다.</dd></dl></div></div>
+<div class="bn"><span class="num">5</span><div><h4>A에게 몰린 PR 확인과 통합 <span class="sev h">높음</span></h4><dl><dt>왜 막히나</dt><dd>모든 PR을 A가 확인하고 merge한다. A는 측정 틀, rbtree, 통합도 맡고 있어서 A가 바쁘면 전원의 PR이 기다린다.</dd><dt>기다리는 사람</dt><dd>전원</dd><dt>푸는 법</dt><dd>PR은 단계 하나씩 작게 올리고, PR 템플릿 체크리스트(빌드, RESULT 출력, 검사 함수, 코딩 스타일)를 채워서 올린다. A는 자기 코드보다 리뷰 요청을 먼저 처리한다. A 본인의 PR은 이은찬이 확인한다.</dd></dl></div></div>
+<div class="bn"><span class="num">6</span><div><h4>최종 측정 → 그래프 → 발표 <span class="sev m">중간</span></h4><dl><dt>왜 막히나</dt><dd>공정하게 재려면 VM 한 대에서만 측정해야 해서 마지막에 한 사람, 한 대로 몰린다. 결과가 늦으면 D의 발표 준비가 밀린다.</dd><dt>기다리는 사람</dt><dd>D</dd><dt>푸는 법</dt><dd>스크립트를 한 번 실행으로 끝나게 만들고, rbtree와 v1으로 1차 측정을 미리 돌려 본다. 슬라이드는 결과 외 부분(배경, 설계, 방법)부터 만들고 그래프 자리는 비워 둔다.</dd></dl></div></div>
+</div>
+<div class="card" style="margin-top:20px"><h3>병목 1을 푸는 첫 회의 안건</h3>
+<ul class="agenda" id="agenda" style="margin-top:10px">
+<li><label><input type="checkbox" id="ag1"><span><b>insert 반환값</b>: 0 / -EEXIST / -ENOMEM</span></label></li>
+<li><label><input type="checkbox" id="ag2"><span><b>remove 반환값</b>: 0 / -ENOENT</span></label></li>
+<li><label><input type="checkbox" id="ag3"><span><b>range의 의미</b>: [lo, hi] 안의 키 개수, 동시 수정 중에는 근사치 허용</span></label></li>
+<li><label><input type="checkbox" id="ag4"><span><b>키 범위</b>: u64, 센티넬로 쓸 0과 U64_MAX는 제외할지</span></label></li>
+<li><label><input type="checkbox" id="ag5"><span><b>init · destroy</b>는 한 스레드에서만 호출</span></label></li>
+<li><label><input type="checkbox" id="ag6"><span><b>RESULT 형식</b>과 최종 측정에 쓸 VM 한 대 지정</span></label></li>
+</ul>
+<p class="small mute" style="margin:10px 0 0">체크 표시는 지금 보는 브라우저에만 저장된다.</p></div>
+</div></section>
+
+<section class="band alt" id="rules"><div class="wrap">
+<div class="sh"><h2>공통 규칙과 함정</h2><p>커널 모듈은 실수 하나에 VM이 멈춘다. 아래는 모두가 지킨다.</p></div>
+<div class="g3 rules">
+<div class="card"><h3>Git</h3><ul>
+<li><code>main</code>에 직접 push하지 않는다</li>
+<li>브랜치는 <code>feat/harness</code>, <code>feat/sl-v2</code>, <code>feat/maple</code>처럼</li>
+<li>PR → 강성준이 확인·approve → merge (강성준의 PR은 이은찬)</li>
+<li>빌드 산출물(<code>*.o</code>, <code>*.ko</code>)은 커밋하지 않는다</li>
+<li>커밋 메시지는 <code>영역: 무엇을</code></li></ul></div>
+<div class="card"><h3>커널 모듈 안전</h3><ul>
+<li>실험 전에 VM 스냅샷을 떠 둔다</li>
+<li>다른 터미널에 <code>dmesg -w</code>를 띄운다</li>
+<li><code>insmod</code> 전에 <code>sync</code></li>
+<li>Oops나 BUG가 뜨면 재부팅한다</li>
+<li>작은 nkeys부터 단계적으로 늘린다</li></ul></div>
+<div class="card"><h3>코드 함정</h3><ul>
+<li>스핀락 안에서 <code>kmalloc(GFP_KERNEL)</code> 금지. 락을 잡기 전에 할당한다</li>
+<li>삭제한 노드를 바로 <code>kfree</code>하지 않는다. 지연 해제 목록에 모았다가 destroy 때 해제한다</li>
+<li>반복문 안에서 <code>pr_info</code> 금지. 요약 한 줄만 출력한다</li>
+<li>스레드별 카운터는 <code>____cacheline_aligned</code>로 false sharing을 막는다</li>
+<li>락은 항상 아래층 → 위층 순서로 잡는다</li></ul></div>
+</div>
+</div></section>
+
+<footer class="band"><div class="wrap g2">
+<div><h3 style="margin-bottom:10px">저장소</h3><p><a href="https://github.com/SJ-log/skiplist-vs-rbtree">github.com/SJ-log/skiplist-vs-rbtree</a></p><p class="small" style="color:#aab3c2;margin:0">단계별 세부 할 일은 저장소의 TEAM_GUIDE.md에 있다.</p></div>
+<div><h3 style="margin-bottom:10px">참고자료</h3><ol>
+<li>W. Pugh, Skip Lists: A Probabilistic Alternative to Balanced Trees, CACM 1990</li>
+<li>M. Herlihy, Y. Lev, V. Luchangco, N. Shavit, A Simple Optimistic Skiplist Algorithm, SIROCCO 2007</li>
+<li>M. Herlihy, N. Shavit, The Art of Multiprocessor Programming, 14장</li>
+<li>Robert Love, Linux Kernel Development 3판, 6장 · 9~10장</li>
+<li>커널 문서: core-api/rbtree.rst, core-api/maple_tree.rst, memory-barriers.txt, RCU/whatisRCU.rst</li></ol></div>
+</div></footer>
+
+<script>
+{
+const RM=matchMedia('(prefers-reduced-motion: reduce)').matches;
+const $=(s,r=document)=>r.querySelector(s);
+const $$=(s,r=document)=>Array.from(r.querySelectorAll(s));
+const redrawers=[];
+const redrawAll=()=>{for(const f of redrawers){try{f();}catch(e){console.error(e);}}};
+const FONT='Figtree, "Noto Sans KR", system-ui, sans-serif';
+
+const probe=document.createElement('div');
+probe.setAttribute('aria-hidden','true');
+probe.style.cssText='position:absolute;width:0;height:0;overflow:hidden;visibility:hidden';
+document.body.appendChild(probe);
+const CN=['ink','mute','rule','panel','bg','red','blue','green','slate','amber'];
+const spans={};
+for(const n of CN){const s=document.createElement('span');s.style.color='var(--'+n+')';probe.appendChild(s);spans[n]=s;}
+const C={};
+const readC=()=>{for(const n of CN)C[n]=getComputedStyle(spans[n]).color;};
+readC();
+const themeObs=new MutationObserver(()=>{readC();redrawAll();});
+themeObs.observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
+const mq=matchMedia('(prefers-color-scheme: dark)');
+if(mq.addEventListener)mq.addEventListener('change',()=>{readC();redrawAll();});
+
+const rr=(ctx,x,y,w,h,r)=>{r=Math.min(r,w/2,h/2);ctx.beginPath();ctx.moveTo(x+r,y);ctx.arcTo(x+w,y,x+w,y+h,r);ctx.arcTo(x+w,y+h,x,y+h,r);ctx.arcTo(x,y+h,x,y,r);ctx.arcTo(x,y,x+w,y,r);ctx.closePath();};
+const lock=(ctx,x,y,s,col,filled)=>{ctx.save();ctx.strokeStyle=col;ctx.fillStyle=col;ctx.lineWidth=Math.max(2,s*.17);ctx.beginPath();ctx.arc(x,y-s*.12,s*.3,Math.PI,0);ctx.stroke();rr(ctx,x-s*.5,y-s*.12,s,s*.64,s*.14);if(filled)ctx.fill();else ctx.stroke();ctx.restore();};
+const fitCanvas=(cv,ctx)=>{const W=cv.clientWidth,H=cv.clientHeight,d=Math.min(2,window.devicePixelRatio||1);cv.width=Math.max(1,Math.round(W*d));cv.height=Math.max(1,Math.round(H*d));ctx.setTransform(d,0,0,d,0,0);return[W,H];};
+
+/* hero: skip list as express/local lines */
+try{
+const box=$('#hero'),svg=box.querySelector('svg'),cap=$('#heroCap');
+const FULL=[[3,1],[7,2],[12,1],[19,4],[25,2],[31,3],[38,1],[44,2],[52,1],[60,3]];
+const SMALL=[[3,1],[7,2],[12,1],[19,4],[25,2],[31,3],[44,1]];
+const LV=4;
+let G=null,pts=[],seg=[],total=0,prog=0,hold=0,ti=0,run=false,last=0,vis=false,tg=25;
+const path=t=>{
+ const nodes=G.nodes;let cur=0;const p=[[0,LV-1]];
+ for(let l=LV-1;l>=0;l--){
+  for(;;){const nx=nodes.find(d=>d.i>cur&&d.lv>l);if(nx&&nx.key<t){cur=nx.i;p.push([cur,l]);}else break;}
+  if(l>0)p.push([cur,l-1]);
+ }
+ const f=nodes.find(d=>d.i>cur&&d.lv>0);
+ if(f&&f.key===t)p.push([f.i,0]);
+ return p;
+};
+const place=()=>{
+ let d=prog,k=0;const out=[pts[0]];
+ while(k<seg.length&&d>seg[k]){d-=seg[k];k++;out.push(pts[k]);}
+ let cur=pts[pts.length-1];
+ if(k<seg.length){const a=pts[k],b=pts[k+1],f=seg[k]?d/seg[k]:0;cur=[a[0]+(b[0]-a[0])*f,a[1]+(b[1]-a[1])*f];out.push(cur);}
+ G.trail.setAttribute('points',out.map(p=>p[0].toFixed(1)+','+p[1].toFixed(1)).join(' '));
+ G.train.setAttribute('cx',cur[0].toFixed(1));G.train.setAttribute('cy',cur[1].toFixed(1));
+};
+const arrive=()=>{
+ const e=pts[pts.length-1];
+ G.hit.setAttribute('cx',e[0].toFixed(1));G.hit.setAttribute('cy',e[1].toFixed(1));G.hit.setAttribute('opacity','1');
+ cap.innerHTML='<b>키 '+tg+'</b> 도착 · 옆으로 '+G.h+'칸, 아래로 '+G.v+'칸 이동했다';
+};
+const setT=()=>{
+ tg=G.targets[ti%G.targets.length];
+ const raw=path(tg);
+ G.h=0;G.v=0;
+ for(let k=1;k<raw.length;k++){if(raw[k][1]===raw[k-1][1])G.h++;else G.v++;}
+ pts=raw.map(([i,l])=>[G.X(i),G.Y(l)]);
+ seg=[];total=0;
+ for(let k=1;k<pts.length;k++){const d=Math.hypot(pts[k][0]-pts[k-1][0],pts[k][1]-pts[k-1][1]);seg.push(d);total+=d;}
+ prog=0;hold=0;G.hit.setAttribute('opacity','0');
+ cap.innerHTML='<b>키 '+tg+'</b> 찾는 중 · 위층에서 크게 건너뛰고, 넘치면 한 층 내려간다';
+ place();
+};
+const build=()=>{
+ const W=box.clientWidth,H=box.clientHeight;if(!W||!H)return;
+ const small=W<600,data=small?SMALL:FULL;
+ const L=small?36:60,R=small?28:48,T=22,B=40;
+ const n=data.length,step=(W-L-R)/(n+1);
+ const X=i=>L+i*step,Y=l=>T+(LV-1-l)*(H-T-B)/(LV-1);
+ const r=Math.max(9,Math.min(15,step*.28));
+ const nodes=data.map((d,k)=>({key:d[0],lv:d[1],i:k+1}));
+ const col=['var(--slate)','color-mix(in srgb, var(--blue) 45%, var(--bg))','color-mix(in srgb, var(--blue) 72%, var(--bg))','var(--blue)'];
+ let s='';
+ for(let l=0;l<LV;l++){
+  s+='<text class="lvl" x="2" y="'+(Y(l)+5).toFixed(1)+'">L'+l+'</text>';
+  s+='<line x1="'+X(0).toFixed(1)+'" y1="'+Y(l).toFixed(1)+'" x2="'+X(n+1).toFixed(1)+'" y2="'+Y(l).toFixed(1)+'" style="stroke:'+col[l]+'" stroke-width="'+(l?7:5)+'" stroke-linecap="round"/>';
+ }
+ s+='<polyline id="hTrail" points="" fill="none" stroke="var(--amber)" stroke-width="'+Math.round(r*.7)+'" stroke-linecap="round" stroke-linejoin="round"/>';
+ for(const nd of nodes){
+  const x=X(nd.i).toFixed(1);
+  if(nd.lv>1)s+='<line x1="'+x+'" y1="'+Y(nd.lv-1).toFixed(1)+'" x2="'+x+'" y2="'+Y(0).toFixed(1)+'" stroke="var(--ink)" stroke-width="3"/>';
+  for(let l=0;l<nd.lv;l++)s+='<circle cx="'+x+'" cy="'+Y(l).toFixed(1)+'" r="'+r.toFixed(1)+'" fill="var(--bg)" stroke="var(--ink)" stroke-width="3"/>';
+  s+='<text class="key" x="'+x+'" y="'+(Y(0)+r+19).toFixed(1)+'" text-anchor="middle">'+nd.key+'</text>';
+ }
+ const hw=Math.max(16,r*1.5),top=Y(LV-1)-r,hh=Y(0)-Y(LV-1)+2*r;
+ s+='<rect x="'+(X(0)-hw/2).toFixed(1)+'" y="'+top.toFixed(1)+'" width="'+hw.toFixed(1)+'" height="'+hh.toFixed(1)+'" rx="'+(hw/2).toFixed(1)+'" fill="var(--ink)"/>';
+ s+='<rect x="'+(X(n+1)-hw/2).toFixed(1)+'" y="'+top.toFixed(1)+'" width="'+hw.toFixed(1)+'" height="'+hh.toFixed(1)+'" rx="'+(hw/2).toFixed(1)+'" fill="var(--bg)" stroke="var(--mute)" stroke-width="2" stroke-dasharray="4 4"/>';
+ s+='<text class="key" x="'+X(0).toFixed(1)+'" y="'+(Y(0)+r+19).toFixed(1)+'" text-anchor="middle">HEAD</text>';
+ s+='<text class="lvl" x="'+X(n+1).toFixed(1)+'" y="'+(Y(0)+r+19).toFixed(1)+'" text-anchor="middle">NIL</text>';
+ s+='<circle id="hHit" r="'+(r+6).toFixed(1)+'" fill="none" stroke="var(--amber)" stroke-width="5" opacity="0"/>';
+ s+='<circle id="hTrain" r="'+(r*.62).toFixed(1)+'" fill="var(--amber)" stroke="var(--ink)" stroke-width="3"/>';
+ svg.setAttribute('viewBox','0 0 '+W+' '+H);
+ svg.innerHTML=s;
+ G={X,Y,nodes,small,targets:small?[25,12,44]:[25,44,12,60],trail:svg.querySelector('#hTrail'),train:svg.querySelector('#hTrain'),hit:svg.querySelector('#hHit'),h:0,v:0};
+ setT();
+ if(RM){prog=total;place();arrive();}
+};
+const frame=ts=>{
+ if(!run)return;
+ const dt=last?Math.min(50,ts-last):16;last=ts;
+ if(hold>0){hold-=dt;if(hold<=0){ti++;setT();}}
+ else{prog+=dt*(G.small?.16:.24);if(prog>=total){prog=total;place();arrive();hold=1800;}else place();}
+ requestAnimationFrame(frame);
+};
+const go=()=>{if(run||RM||!vis||!G)return;run=true;last=0;requestAnimationFrame(frame);};
+const heroRO=new ResizeObserver(()=>{build();go();});
+heroRO.observe(box);
+const heroIO=new IntersectionObserver(es=>{vis=es[0].isIntersecting;if(vis)go();else run=false;});
+heroIO.observe(box);
+}catch(e){console.error(e);}
+
+/* lock simulator */
+try{
+const SEG=8,PAL=['#0a5cff','#e6261f','#00a05a','#ffb400','#8b5cf6','#0891b2','#f97316','#db2777'];
+const CRIT={g:420,f:500};
+const think=()=>200+Math.random()*160;
+const rnd=n=>Math.floor(Math.random()*n);
+const mk=(kind,el)=>{const cv=el.querySelector('canvas');return{kind,el,cv,ctx:cv.getContext('2d'),th:[],ops:0,time:0,gh:null,gq:[],sh:[],sq:[],W:0,H:0};};
+const sims=[mk('g',$('#simG')),mk('f',$('#simF'))];
+let N=4,playing=!RM,vis=false,run=false,last=0,lastRead=0;
+const reset=s=>{s.th=[];for(let i=0;i<N;i++)s.th.push({id:i,st:'think',left:Math.random()*300,seg:rnd(SEG),x:null,y:null});s.ops=0;s.time=0;s.gh=null;s.gq=[];s.sh=new Array(SEG).fill(null);s.sq=Array.from({length:SEG},()=>[]);};
+const step=(s,dt)=>{
+ s.time+=dt;
+ for(const t of s.th){
+  if(t.st==='think'){t.left-=dt;if(t.left<=0){t.st='wait';t.seg=rnd(SEG);if(s.kind==='g')s.gq.push(t);else s.sq[t.seg].push(t);}}
+  else if(t.st==='work'){t.left-=dt;if(t.left<=0){s.ops++;if(s.kind==='g')s.gh=null;else s.sh[t.seg]=null;t.st='think';t.left=think();}}
+ }
+ if(s.kind==='g'){if(!s.gh&&s.gq.length){const t=s.gq.shift();s.gh=t;t.st='work';t.left=CRIT.g;}}
+ else{for(let k=0;k<SEG;k++){if(!s.sh[k]&&s.sq[k].length){const t=s.sq[k].shift();s.sh[k]=t;t.st='work';t.left=CRIT.f;}}}
+};
+const draw=(s,dt)=>{
+ const ctx=s.ctx,W=s.W,H=s.H;if(!W||!H)return;
+ ctx.clearRect(0,0,W,H);
+ const pad=12,gap=5,bw=(W-pad*2-gap*(SEG-1))/SEG,bh=Math.min(54,H*.22),by=Math.round(H*.44);
+ const bx=k=>pad+k*(bw+gap);
+ ctx.textAlign='center';ctx.textBaseline='middle';
+ if(s.kind==='g'){
+  const held=!!s.gh;
+  ctx.lineWidth=3;ctx.strokeStyle=held?C.red:C.rule;rr(ctx,pad-5,by-24,W-pad*2+10,bh+32,12);ctx.stroke();
+  ctx.font='700 13px '+FONT;
+  const label='트리 전체 락',tw=ctx.measureText(label).width,bxw=tw+42;
+  ctx.fillStyle=C.bg;ctx.fillRect(W/2-bxw/2,by-36,bxw,24);
+  lock(ctx,W/2-bxw/2+14,by-24,14,held?C.red:C.mute,held);
+  ctx.fillStyle=held?C.red:C.mute;ctx.textAlign='left';ctx.fillText(label,W/2-bxw/2+30,by-24);ctx.textAlign='center';
+ }
+ ctx.font='700 13px '+FONT;
+ for(let k=0;k<SEG;k++){
+  const busy=s.kind==='g'?!!(s.gh&&s.gh.seg===k):!!s.sh[k];
+  const ac=s.kind==='g'?C.red:C.blue;
+  rr(ctx,bx(k),by,bw,bh,8);ctx.fillStyle=busy?C.panel:C.bg;ctx.fill();ctx.lineWidth=busy?3:2;ctx.strokeStyle=busy?ac:C.rule;ctx.stroke();
+  ctx.fillStyle=C.mute;ctx.fillText(String.fromCharCode(65+k),bx(k)+bw/2,by+bh-12);
+  if(s.kind==='f')lock(ctx,bx(k)+bw/2,by-12,Math.min(13,bw*.4),busy?C.blue:C.mute,busy);
+ }
+ const wi=new Map();
+ if(s.kind==='g'){const c=new Array(SEG).fill(0);for(const t of s.gq)wi.set(t,c[t.seg]++);}
+ else s.sq.forEach(q=>q.forEach((t,i)=>wi.set(t,i)));
+ const a=Math.min(1,dt*.012),rad=Math.max(5,Math.min(7,bw*.22));
+ for(const t of s.th){
+  let tx,ty;
+  if(t.st==='work'){tx=bx(t.seg)+bw/2;ty=by+bh/2-7;}
+  else if(t.st==='wait'){tx=bx(t.seg)+bw/2;ty=by-(s.kind==='g'?48:30)-Math.min(4,wi.get(t)||0)*(rad*2+2);}
+  else{tx=pad+(t.id+.5)*(W-pad*2)/N;ty=by+bh+34+(t.id%2)*16;}
+  if(t.x===null){t.x=tx;t.y=ty;}
+  t.x+=(tx-t.x)*a;t.y+=(ty-t.y)*a;
+  ctx.beginPath();ctx.arc(t.x,t.y,rad,0,Math.PI*2);
+  if(t.st==='wait'){ctx.fillStyle=C.bg;ctx.fill();ctx.lineWidth=3;ctx.strokeStyle=PAL[t.id];ctx.stroke();}
+  else{ctx.fillStyle=PAL[t.id];ctx.fill();}
+ }
+ ctx.font='600 13px '+FONT;ctx.fillStyle=C.mute;ctx.textAlign='left';
+ ctx.fillText('락 밖에서 준비',pad,H-12);
+ ctx.textAlign='right';ctx.fillText('빈 원 = 대기',W-pad,H-12);
+};
+const readout=()=>{
+ const r=sims.map(s=>s.time>0?s.ops/(s.time/1000):0);
+ sims.forEach((s,i)=>{s.el.querySelector('.ops').textContent=s.ops;s.el.querySelector('.rate').textContent=r[i].toFixed(1);});
+ const v=$('#simV');
+ if(sims[0].time<3000||!r[0]){v.textContent='스레드 '+N+'개 · 측정 중';return;}
+ const q=r[1]/r[0];
+ v.innerHTML=q>=1?'스레드 '+N+'개 · 노드별 락이 전역 락의 <em>'+q.toFixed(1)+'배</em>를 처리한다 (모형)':'스레드 '+N+'개 · 전역 락이 <em>'+(1/q).toFixed(1)+'배</em> 앞선다 (모형). 연산 한 번이 더 짧기 때문이다';
+};
+const loop=ts=>{
+ if(!run)return;
+ const dt=last?Math.min(50,ts-last):16;last=ts;
+ for(const s of sims){step(s,dt);draw(s,dt);}
+ if(ts-lastRead>250){lastRead=ts;readout();}
+ requestAnimationFrame(loop);
+};
+const go=()=>{if(run||!playing||!vis)return;run=true;last=0;requestAnimationFrame(loop);};
+const stop=()=>{run=false;};
+const restart=()=>{sims.forEach(s=>{reset(s);draw(s,1000);});readout();};
+$$('#simN button').forEach(b=>b.addEventListener('click',()=>{N=+b.dataset.n;$$('#simN button').forEach(x=>x.setAttribute('aria-pressed',String(x===b)));restart();}));
+const pb=$('#simPlay');
+const setPB=()=>{pb.textContent=playing?'일시정지':'재생';};
+pb.addEventListener('click',()=>{playing=!playing;setPB();if(playing)go();else stop();});
+$('#simReset').addEventListener('click',restart);
+setPB();
+sims.forEach(reset);
+const simRO=new ResizeObserver(()=>{for(const s of sims){const wh=fitCanvas(s.cv,s.ctx);s.W=wh[0];s.H=wh[1];draw(s,1000);}});
+sims.forEach(s=>simRO.observe(s.cv));
+const simIO=new IntersectionObserver(es=>{vis=es.some(e=>e.isIntersecting);if(vis)go();else stop();});
+simIO.observe($('#simWrap'));
+redrawers.push(()=>{if(!run)sims.forEach(s=>draw(s,1000));});
+readout();
+}catch(e){console.error(e);}
+
+/* range scan */
+try{
+const box=$('#scanFig'),cv=box.querySelector('canvas'),ctx=cv.getContext('2d');
+let W=0,H=0,run=false,vis=false,t0=0;
+const M=12,OCC=[0,1,2,4,5,6,8,9,11],WR=[3,7,10],ARR=[600,1700,2800],SCAN=4000,CYC=6400;
+const INS={rb:[4300,4550,4800],v2:ARR.map(a=>a+260)};
+const draw=t=>{
+ if(!W||!H)return;
+ ctx.clearRect(0,0,W,H);
+ const pad=14,sp=(W-pad*2)/(M-1),r=Math.max(6,Math.min(10,sp*.3));
+ const scanning=t<SCAN,sx=pad+Math.min(1,t/SCAN)*(W-pad*2);
+ const rows=[{k:'rb',y:H*.33,label:'rbtree + 전역 락',c:C.red},{k:'v2',y:H*.79,label:'skip list v2',c:C.blue}];
+ for(const row of rows){
+  const y=row.y,ins=INS[row.k];
+  ctx.textBaseline='middle';ctx.textAlign='left';ctx.font='700 14px '+FONT;ctx.fillStyle=C.ink;
+  ctx.fillText(row.label,pad,y-50);
+  const lw=ctx.measureText(row.label).width;
+  ctx.font='600 13px '+FONT;
+  if(row.k==='rb'){lock(ctx,pad+lw+18,y-50,13,scanning?C.red:C.mute,scanning);ctx.fillStyle=scanning?C.red:C.mute;ctx.fillText(scanning?'스캔이 락을 쥐고 있음':'락 풀림',pad+lw+32,y-50);}
+  else{ctx.fillStyle=C.blue;ctx.fillText('락 없이 훑는다',pad+lw+14,y-50);}
+  ctx.strokeStyle=C.rule;ctx.lineWidth=4;ctx.beginPath();ctx.moveTo(pad,y);ctx.lineTo(W-pad,y);ctx.stroke();
+  if(scanning){ctx.globalAlpha=.4;ctx.fillStyle=C.amber;rr(ctx,sx-sp*.7,y-r-7,sp*1.4,2*r+14,r+7);ctx.fill();ctx.globalAlpha=1;}
+  for(let i=0;i<M;i++){
+   const x=pad+i*sp,w=WR.indexOf(i);
+   let filled=OCC.includes(i),fresh=false;
+   if(w>=0&&t>=ins[w]){filled=true;fresh=true;}
+   ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);
+   if(filled){ctx.fillStyle=fresh?row.c:C.bg;ctx.fill();ctx.lineWidth=2.5;ctx.strokeStyle=C.ink;ctx.stroke();}
+   else{ctx.fillStyle=C.bg;ctx.fill();ctx.setLineDash([3,3]);ctx.lineWidth=2;ctx.strokeStyle=C.mute;ctx.stroke();ctx.setLineDash([]);}
+   if(w>=0&&t>=ARR[w]&&t<ins[w]){
+    const p=Math.max(0,Math.min(1,(t-(ins[w]-260))/260));
+    const wy=(y-r-18)+(r+18)*p;
+    ctx.beginPath();ctx.arc(x,wy,r*.85,0,Math.PI*2);ctx.fillStyle=row.c;ctx.fill();
+    if(p===0){ctx.fillStyle=C.bg;ctx.fillRect(x-r*.38,wy-r*.4,r*.24,r*.8);ctx.fillRect(x+r*.14,wy-r*.4,r*.24,r*.8);}
+   }
+  }
+  const done=ins.filter(v=>v<=Math.min(t,SCAN)).length;
+  ctx.textAlign='left';ctx.font='700 13px '+FONT;ctx.fillStyle=done?row.c:C.mute;
+  ctx.fillText('스캔 중 처리한 쓰기 '+done+'건',pad,y+r+18);
+ }
+};
+const still=()=>draw(RM?3300:0);
+const frame=ts=>{if(!run)return;if(!t0)t0=ts;draw((ts-t0)%CYC);requestAnimationFrame(frame);};
+const go=()=>{if(run||RM||!vis)return;run=true;t0=0;requestAnimationFrame(frame);};
+const scanRO=new ResizeObserver(()=>{const wh=fitCanvas(cv,ctx);W=wh[0];H=wh[1];if(!run)still();});
+scanRO.observe(cv);
+const scanIO=new IntersectionObserver(es=>{vis=es[0].isIntersecting;if(vis)go();else run=false;});
+scanIO.observe(box);
+redrawers.push(()=>{if(!run)still();});
+}catch(e){console.error(e);}
+
+/* expected throughput chart */
+try{
+const box=$('#chart'),svg=box.querySelector('svg'),title=$('#chartTitle');
+const TH=[1,2,4,8];
+const SER=[
+ {k:'rbs',n:'rbtree + spin',s:'rb·spin',c:'var(--red)',w:3},
+ {k:'rbw',n:'rbtree + rw',s:'rb·rw',c:'var(--red)',w:3,d:'7 6'},
+ {k:'v1',n:'skip v1',s:'v1',c:'var(--slate)',w:3},
+ {k:'mt',n:'maple tree',s:'maple',c:'var(--green)',w:3},
+ {k:'v2',n:'skip v2',s:'v2',c:'var(--blue)',w:5}
+];
+const MIX={
+ r:{t:'탐색만 하면 maple tree와 rwlock도 함께 오른다',d:{rbs:[1,1.04,1.07,1.08],rbw:[.98,1.8,3.1,5.2],v1:[.8,.83,.85,.86],mt:[1.08,2.1,4,7.4],v2:[.8,1.55,3,5.7]}},
+ a:{t:'쓰기가 10%만 섞여도 rwlock은 꺾인다',d:{rbs:[1,1.03,1.04,1.05],rbw:[.97,1.4,1.85,2.1],v1:[.8,.82,.83,.84],mt:[1.04,1.9,3.3,5.1],v2:[.8,1.5,2.9,5.4]}},
+ b:{t:'쓰기가 절반이면 v2만 계속 오른다',d:{rbs:[1,1,1,.99],rbw:[.95,.98,1,1],v1:[.78,.79,.8,.8],mt:[.92,1.1,1.25,1.3],v2:[.78,1.45,2.7,4.8]}},
+ c:{t:'쓰기만 하면 maple tree도 한 줄로 선다',d:{rbs:[1,.98,.96,.94],rbw:[.95,.93,.91,.9],v1:[.78,.77,.76,.75],mt:[.82,.83,.84,.84],v2:[.75,1.4,2.6,4.5]}}
+};
+let mix='b';
+const draw=anim=>{
+ const W=box.clientWidth,H=box.clientHeight;if(!W||!H)return;
+ const narrow=W<520,L=narrow?10:18,R=narrow?62:112,T=26,B=46,ymax=8;
+ const x=i=>L+i*(W-L-R)/(TH.length-1),y=v=>T+(H-T-B)*(1-v/ymax);
+ let s='<defs><clipPath id="cclip"><rect id="cclipR" x="0" y="0" width="'+(anim&&!RM?0:W)+'" height="'+H+'"/></clipPath></defs>';
+ for(const g of [2,4,6,8])s+='<line x1="'+L+'" x2="'+(W-R)+'" y1="'+y(g).toFixed(1)+'" y2="'+y(g).toFixed(1)+'" stroke="var(--rule)"/>';
+ s+='<line x1="'+L+'" x2="'+(W-R)+'" y1="'+y(0).toFixed(1)+'" y2="'+y(0).toFixed(1)+'" stroke="var(--ink)" stroke-width="1.5"/>';
+ TH.forEach((t,i)=>{s+='<text class="lvl" x="'+x(i).toFixed(1)+'" y="'+(H-B+22)+'" text-anchor="middle">'+t+'</text>';});
+ s+='<text class="lvl" x="'+(W-R)+'" y="'+(H-4)+'" text-anchor="end">스레드 수 →</text>';
+ s+='<text class="lvl" x="'+L+'" y="'+(T-10)+'">처리량 (상대값) ↑</text>';
+ const ends=[];
+ let g='';
+ for(const sr of SER){
+  const v=MIX[mix].d[sr.k],p=v.map((val,i)=>[x(i),y(val)]);
+  g+='<polyline points="'+p.map(q=>q[0].toFixed(1)+','+q[1].toFixed(1)).join(' ')+'" fill="none" stroke="'+sr.c+'" stroke-width="'+sr.w+'" stroke-linejoin="round" stroke-linecap="round"'+(sr.d?' stroke-dasharray="'+sr.d+'"':'')+'/>';
+  for(const q of p)g+='<circle cx="'+q[0].toFixed(1)+'" cy="'+q[1].toFixed(1)+'" r="'+(sr.k==='v2'?5:3.5)+'" fill="'+sr.c+'"/>';
+  ends.push({y:p[3][1],sr});
+ }
+ s+='<g clip-path="url(#cclip)">'+g+'</g>';
+ ends.sort((a,b)=>a.y-b.y);
+ for(let i=1;i<ends.length;i++)if(ends[i].y-ends[i-1].y<17)ends[i].y=ends[i-1].y+17;
+ const over=ends[ends.length-1].y-(H-B);
+ if(over>0)ends.forEach(e=>{e.y-=over;});
+ for(const e of ends)s+='<text x="'+(W-R+10)+'" y="'+(e.y+5).toFixed(1)+'" style="fill:'+e.sr.c+';font-weight:800">'+(narrow?e.sr.s:e.sr.n)+'</text>';
+ svg.setAttribute('viewBox','0 0 '+W+' '+H);
+ svg.innerHTML=s;
+ title.textContent=MIX[mix].t;
+ if(anim&&!RM){
+  const rect=svg.querySelector('#cclipR'),st=performance.now();
+  const tick=now=>{const k=Math.min(1,(now-st)/900);rect.setAttribute('width',(W*(1-(1-k)**3)).toFixed(1));if(k<1)requestAnimationFrame(tick);};
+  requestAnimationFrame(tick);
+ }
+};
+$$('#mixSeg button').forEach(b=>b.addEventListener('click',()=>{mix=b.dataset.m;$$('#mixSeg button').forEach(x=>x.setAttribute('aria-pressed',String(x===b)));draw(true);}));
+let first=true;
+const chartRO=new ResizeObserver(()=>{draw(first);first=false;});
+chartRO.observe(box);
+}catch(e){console.error(e);}
+
+/* copy, agenda, reduced motion */
+try{
+$$('.copy').forEach(b=>b.addEventListener('click',async()=>{
+ const t=$(b.dataset.t).textContent;
+ try{await navigator.clipboard.writeText(t);b.textContent='복사됨';}catch(e){b.textContent='복사 안 됨';}
+ setTimeout(()=>{b.textContent='복사';},1600);
+}));
+const KEY='slrb-agenda';
+let saved={};
+try{saved=JSON.parse(localStorage.getItem(KEY)||'{}')||{};}catch(e){saved={};}
+$$('#agenda input').forEach(i=>{i.checked=!!saved[i.id];i.addEventListener('change',()=>{saved[i.id]=i.checked;try{localStorage.setItem(KEY,JSON.stringify(saved));}catch(e){}});});
+if(RM){const b=$('#bnSvg');try{b.pauseAnimations();}catch(e){}const tk=$('#bnTok');if(tk)tk.style.display='none';}
+if(document.fonts&&document.fonts.ready)document.fonts.ready.then(redrawAll);
+}catch(e){console.error(e);}
+}
+</script>
+</body>
+</html>
