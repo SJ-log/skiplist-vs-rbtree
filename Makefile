@@ -1,6 +1,10 @@
 # 구현 하나 + harness = 모듈 하나
 # 구현 파일이 생기면 해당 두 줄의 주석을 푼다.
 
+obj-m += bench_dummy.o
+bench_dummy-objs := harness/harness.o ds/dummy.o
+
+
 # obj-m += bench_rb.o
 # bench_rb-objs := harness/harness.o ds/rbtree_lock.o
 
