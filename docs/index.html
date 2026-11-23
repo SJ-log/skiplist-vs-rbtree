@@ -484,7 +484,7 @@ footer ol{font-size:15px}
 <tr><td><code>scan_len</code></td><td>100 · 1,000</td><td>한 번에 훑는 키 범위</td></tr>
 <tr><td><code>duration_ms</code></td><td>3000</td><td>측정 시간</td></tr>
 </tbody></table></div>
-<p class="small" style="margin-top:12px">결과는 한 줄로 출력하고 D가 파싱한다.<br><code>RESULT,ds,threads,nkeys,search,insert,remove,scan,ops,elapsed_ns</code></p></div>
+<p class="small" style="margin-top:12px">결과는 한 줄로 출력하고 D가 파싱한다.<br><code>RESULT,ds,threads,nkeys,search,insert,remove,scan_len,ops,scan_ops,elapsed_ns</code><br>처리량은 ops를 3초가 아니라 elapsed_ns로 나눠서 구한다. 실제 경과 시간이 3초보다 조금 길게 나온다.</p></div>
 </div>
 </div></section>
 
@@ -507,7 +507,7 @@ footer ol{font-size:15px}
 <li>module_param으로 파라미터 받기</li>
 <li>kthread_bind로 CPU 고정, completion으로 동시 출발과 종료 대기</li>
 <li>ktime_get_ns, 스레드별 prandom_u32_state</li>
-<li>false sharing과 ____cacheline_aligned</li></ul></div>
+<li>false sharing과 캐시 라인 정렬 (Apple Silicon은 128바이트)</li></ul></div>
 <div class="card"><h4><span class="dot" style="background:var(--slate)"></span>B 이은찬 · v1과 검증</h4><ul>
 <li>유연 배열 멤버로 층 수만큼만 할당하기</li>
 <li>random_level: 난수 하나로 층 수 정하기</li>
@@ -529,13 +529,13 @@ footer ol{font-size:15px}
 
 <section class="band alt" id="roles"><div class="wrap">
 <div class="sh"><h2>역할: 각자 자기 노선 하나</h2>
-<p>사람마다 색이 곧 자기 구현의 색이다. 모든 PR은 강성준이 확인하고, 강성준의 PR은 이은찬이 확인한다. 백업 짝(강성준 ↔ 이은찬, 이우신 ↔ 종주원)은 서로의 파트를 설명할 수 있게 유지한다.</p></div>
+<p>사람마다 색이 곧 자기 구현의 색이다. 모든 PR은 강성준이 확인하고, 강성준의 PR은 리뷰 없이 직접 merge한다. 백업 짝(강성준 ↔ 이은찬, 이우신 ↔ 종주원)은 서로의 파트를 설명할 수 있게 유지한다.</p></div>
 <div class="roles">
 <article class="role" style="--c:var(--red)">
 <div class="rh"><span class="rl">A</span><div><h3>강성준 · PM</h3><p>측정 틀 + 기준 구현 rbtree</p></div></div>
 <ul>
 <li>PM: 첫 회의 진행, 저장소와 브랜치 보호, 주 1회 15분 점검</li>
-<li><b>모든 PR 확인과 merge</b> (내 PR은 이은찬이 확인)</li>
+<li><b>모든 PR 확인과 merge</b> (내 PR은 리뷰 없이 직접 merge)</li>
 <li>측정 틀: 파라미터, 미리 채우기, kthread N개 동시 출발, 1~4 스레드와 CPU 고정</li>
 <li>부하: 탐색·삽입·삭제 비율 섞기, 범위 탐색 스레드</li>
 <li>rbtree + spinlock / rwlock, range 포함</li>
@@ -651,7 +651,7 @@ footer ol{font-size:15px}
 <div class="bn"><span class="num">2</span><div><h4>측정 틀 (A) <span class="sev h">높음</span></h4><dl><dt>왜 막히나</dt><dd>v1·v2·xarray 모두 harness에 끼워야 돌려 볼 수 있고, D의 스크립트도 harness 출력을 읽는다.</dd><dt>기다리는 사람</dt><dd>B, C, D</dd><dt>푸는 법</dt><dd>A가 아무 일도 안 하는 더미 구현으로 harness를 먼저 올린다. 기능은 삽입·탐색 → 삭제 섞기 → 스캔 스레드 순서로 덧붙인다. 그동안 다른 사람은 각자 작은 테스트 모듈로 혼자 검증한다.</dd></dl></div></div>
 <div class="bn max"><span class="num">3</span><div><h4>v2 구현·안정화 (C) <span class="sev x">가장 큼</span></h4><dl><dt>왜 막히나</dt><dd>가장 어렵고, 핵심 결과와 최종 측정이 전부 v2를 기다린다.</dd><dt>기다리는 사람</dt><dd>최종 측정, 발표의 결과 파트</dd><dt>푸는 법</dt><dd>구현 전에 의사코드와 락 순서 문서를 B와 리뷰한다. 탐색 → 삽입 → 삭제 순서로 작은 PR을 올린다. C에게 다른 일을 얹지 않는다. 끝내 불안정하면 v1 결과 + v2 설계·부분 결과 + 막힌 이유 분석으로 발표한다.</dd></dl></div></div>
 <div class="bn"><span class="num">4</span><div><h4>정합성 검사 함수 (B) <span class="sev m">중간</span></h4><dl><dt>왜 막히나</dt><dd>v2 스트레스 테스트가 이 함수로 통과 여부를 판정한다.</dd><dt>기다리는 사람</dt><dd>C</dd><dt>푸는 법</dt><dd>B가 노드 구조체와 검사 함수부터 공개한다. v1이 완성되기 전이어도 된다. C는 같은 뼈대 위에 필드만 추가한다.</dd></dl></div></div>
-<div class="bn"><span class="num">5</span><div><h4>A에게 몰린 PR 확인과 통합 <span class="sev h">높음</span></h4><dl><dt>왜 막히나</dt><dd>모든 PR을 A가 확인하고 merge한다. A는 측정 틀, rbtree, 통합도 맡고 있어서 A가 바쁘면 전원의 PR이 기다린다.</dd><dt>기다리는 사람</dt><dd>전원</dd><dt>푸는 법</dt><dd>PR은 단계 하나씩 작게 올리고, PR 템플릿 체크리스트(빌드, RESULT 출력, 검사 함수, 코딩 스타일)를 채워서 올린다. A는 자기 코드보다 리뷰 요청을 먼저 처리한다. A 본인의 PR은 이은찬이 확인한다.</dd></dl></div></div>
+<div class="bn"><span class="num">5</span><div><h4>A에게 몰린 PR 확인과 통합 <span class="sev h">높음</span></h4><dl><dt>왜 막히나</dt><dd>모든 PR을 A가 확인하고 merge한다. A는 측정 틀, rbtree, 통합도 맡고 있어서 A가 바쁘면 전원의 PR이 기다린다.</dd><dt>기다리는 사람</dt><dd>전원</dd><dt>푸는 법</dt><dd>PR은 단계 하나씩 작게 올리고, PR 템플릿 체크리스트(빌드, RESULT 출력, 검사 함수, 코딩 스타일)를 채워서 올린다. A는 자기 코드보다 리뷰 요청을 먼저 처리한다. A 본인의 PR은 리뷰를 기다리지 않고 직접 merge한다.</dd></dl></div></div>
 <div class="bn"><span class="num">6</span><div><h4>최종 측정 → 그래프 → 발표 <span class="sev m">중간</span></h4><dl><dt>왜 막히나</dt><dd>공정하게 재려면 VM 한 대에서만 측정해야 해서 마지막에 한 사람, 한 대로 몰린다. 결과가 늦으면 D의 발표 준비가 밀린다.</dd><dt>기다리는 사람</dt><dd>D</dd><dt>푸는 법</dt><dd>스크립트를 한 번 실행으로 끝나게 만들고, rbtree와 v1으로 1차 측정을 미리 돌려 본다. 슬라이드는 결과 외 부분(배경, 설계, 방법)부터 만들고 그래프 자리는 비워 둔다.</dd></dl></div></div>
 </div>
 <div class="card" style="margin-top:20px"><h3>병목 1을 푸는 첫 회의 안건</h3>
@@ -674,7 +674,7 @@ footer ol{font-size:15px}
 <div class="card"><h3>Git</h3><ul>
 <li><code>main</code>에 직접 push하지 않는다</li>
 <li>브랜치는 <code>feat/harness</code>, <code>feat/sl-v2</code>, <code>feat/xarray</code>처럼</li>
-<li>PR → 강성준이 확인·approve → merge (강성준의 PR은 이은찬)</li>
+<li>PR → 강성준이 확인·approve → merge (강성준의 PR은 리뷰 없이 직접 merge)</li>
 <li>빌드 산출물(<code>*.o</code>, <code>*.ko</code>)은 커밋하지 않는다</li>
 <li>커밋 메시지는 <code>영역: 무엇을</code></li></ul></div>
 <div class="card"><h3>커널 모듈 안전</h3><ul>
@@ -687,7 +687,7 @@ footer ol{font-size:15px}
 <li>스핀락 안에서 <code>kmalloc(GFP_KERNEL)</code> 금지. 락을 잡기 전에 할당한다</li>
 <li>삭제한 노드를 바로 <code>kfree</code>하지 않는다. 지연 해제 목록에 모았다가 destroy 때 해제한다</li>
 <li>반복문 안에서 <code>pr_info</code> 금지. 요약 한 줄만 출력한다</li>
-<li>스레드별 카운터는 <code>____cacheline_aligned</code>로 false sharing을 막는다</li>
+<li>스레드별 카운터는 <code>__aligned(128)</code>로 false sharing을 막는다. Apple Silicon의 캐시 라인이 128바이트라 <code>____cacheline_aligned</code>(64바이트)로는 부족하다</li>
 <li>락은 항상 아래층 → 위층 순서로 잡는다</li></ul></div>
 </div>
 </div></section>
