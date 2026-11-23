@@ -14,28 +14,37 @@
 - `harness/`, `ds/`, `tests/`, `scripts/`는 아직 없다
 - 첫 회의(ds_ops 확정)는 아직 안 했다
 
-## 내 VM 정보 (시작 전에 채우기)
+## 내 VM 정보 (2026-11-23 확인)
 
 다음 세션이 헤더 버전에 맞춰 코드를 쓰도록 VM에서 확인해 적어 둔다.
 
 | 항목 | 명령 | 값 |
 |---|---|---|
-| 커널 버전 | `uname -r` | |
-| 아키텍처 | `uname -m` | |
-| vCPU 수 | `nproc` | |
-| 배포판 | `lsb_release -d` | |
+| 커널 버전 | `uname -r` | 5.4.214SJKang+ |
+| 아키텍처 | `uname -m` | aarch64 |
+| vCPU 수 | `nproc` | 4 |
+| 배포판 | `lsb_release -d` | Ubuntu 20.04.5 LTS |
+
+이 환경에서 주의할 점:
+
+- 커널 5.4 → 워커 종료는 `complete_and_exit`를 쓴다 (`kthread_complete_and_exit`는 5.17부터)
+- maple tree는 6.1부터 있어서 이 커널에서는 빌드할 수 없다 → D 파트를 xarray로 바꾸는 안을 첫 회의에 올린다
+- vCPU 4개 → 이 VM에서는 `nthreads=8` 조건을 돌릴 수 없다. 스레드 수는 1·2·4로 제안한다
+- `/lib/modules/$(uname -r)/build`가 있어서 모듈 빌드는 바로 된다 (확인함)
 
 ---
 
 ## 0. PM으로 먼저 할 일
 
-- [ ] **첫 회의** — 아래 6개를 확정한다 (괄호는 제안값)
+- [ ] **첫 회의** — 아래 8개를 확정한다 (괄호는 제안값)
   1. `insert` 반환값 (0 / `-EEXIST` / `-ENOMEM`)
   2. `remove` 반환값 (0 / `-ENOENT`)
   3. `range(lo, hi)` 의미 ([lo, hi] 안의 키 개수, 동시 수정 중에는 근사치 허용)
   4. 키 범위 (사용자 키는 `[1, 2 × nkeys]`. 0과 `U64_MAX`는 센티넬용으로 비워 둔다)
   5. `init` · `destroy`는 한 스레드에서만 호출
   6. RESULT 형식(아래 제안)과 최종 측정에 쓸 VM 한 대
+  7. maple tree 대신 xarray (커널 5.4에는 maple tree가 없다). 팀원 VM의 커널 버전도 확인
+  8. 스레드 수 (1·2·4. VM의 vCPU를 8개로 늘릴 수 있으면 8도), 범위 탐색의 쓰기 스레드 (1·2·3)
 - [ ] 회의 결과를 `include/ds_ops.h`에 반영하는 PR (`range` 추가, 반환값 주석)
 - [ ] GitHub: 협업자 초대, `main` 보호 규칙 (Settings → Branches: PR 필수, 승인 1명)
   - `.github/CODEOWNERS`가 모든 PR의 리뷰 요청을 나에게 보낸다
@@ -71,7 +80,7 @@
 - `range`: lower bound를 찾고 `rb_next`로 `hi`까지 센다 (spin은 락, rw는 읽기 락 안에서)
 - `destroy`: `rbtree_postorder_for_each_entry_safe`로 전부 `kfree`
 
-### 4단계 — 스레드 1~8, CPU 고정, false sharing
+### 4단계 — 스레드 1~4, CPU 고정, false sharing
 
 - `nthreads > num_online_cpus()`면 거부한다 (측정 의미가 없어진다)
 - 워커 i는 CPU `i % num_online_cpus()`에 고정
@@ -83,6 +92,7 @@
 - 파라미터 `scan_threads`(0 · 1), `scan_len`(100 · 1,000)
 - 스캔 스레드는 무작위 `lo`에서 `range(lo, lo + scan_len - 1)`을 반복하고, 스캔 횟수를 따로 센다
 - 스캔 스레드는 `nthreads`(워커 수)에 포함하지 않는다
+- `nthreads + scan_threads > num_online_cpus()`면 거부한다 (vCPU 4개면 쓰기 3 + 스캔 1까지)
 
 ### 6단계 — 통합
 
@@ -115,7 +125,7 @@ static DECLARE_COMPLETION(start);   /* 출발 신호: complete_all() */
 static bool stop;                   /* READ_ONCE / WRITE_ONCE */
 ```
 
-- 워커: `wait_for_completion(&start)` → `while (!READ_ONCE(stop))` 루프 → `kthread_complete_and_exit(&w->done, 0)` (커널 5.17 미만이면 `complete_and_exit`)
+- 워커: `wait_for_completion(&start)` → `while (!READ_ONCE(stop))` 루프 → `complete_and_exit(&w->done, 0)` (커널 5.4 기준. 5.17부터는 `kthread_complete_and_exit`)
 - 메인: `kthread_create` → `kthread_bind` → `wake_up_process` (bind는 반드시 wake 전에) → 전원 준비 확인 → `t0 = ktime_get_ns()` → `complete_all(&start)` → `msleep(duration_ms)` → `WRITE_ONCE(stop, true)` → 각 워커의 `done` 대기 → `t1`
 - 출발 신호를 busy-wait로 기다리면 메인 스레드가 CPU를 못 얻을 수 있다. completion으로 잠들어 기다린다
 - 측정 루프에 `cond_resched()`가 없으면 vCPU 수 = 스레드 수일 때 `stop`을 거는 메인이 늦게 깬다
@@ -141,7 +151,7 @@ spin_unlock(&lock);
 
 ## 완료 기준
 
-- `bench_rb.ko`, `bench_rbw.ko`가 nthreads=1·2·4·8에서 RESULT를 출력한다
+- `bench_rb.ko`, `bench_rbw.ko`가 nthreads=1·2·4에서 RESULT를 출력한다
 - 같은 조건 5번의 처리량 편차가 10% 안팎이다
 - `rmmod` 후 누수가 없다 (성공한 insert − remove 개수와 destroy에서 해제한 개수가 일치)
 - 더미 구현으로 D의 스크립트가 처음부터 끝까지 돈다

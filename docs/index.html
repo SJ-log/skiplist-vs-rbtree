@@ -11,7 +11,7 @@
 /* VOICE   work: a briefing four teammates read before splitting up a kernel project
    IDEA    a metro map: skip list levels are express and local lines, each teammate runs one coloured line
    PICTURE skip list drawn as express/local lines with a train searching a key; a live lock simulator below
-   COLOUR  white or night #0e1116, black ink; red rbtree·A, slate v1·B, blue v2·C, green maple·D, amber = waiting points
+   COLOUR  white or night #0e1116, black ink; red rbtree·A, slate v1·B, blue v2·C, green xarray·D, amber = waiting points
    TYPE    Figtree 800 + Figtree, Noto Sans KR for Hangul, JetBrains Mono for code
    LAYOUT  title and key facts across the top, metro picture full width beneath; every section is a station */
 :root{color-scheme:light dark;--bg:light-dark(#ffffff,#0e1116);--ink:light-dark(#121418,#eef1f6);--mute:light-dark(#566070,#9aa4b5);--rule:light-dark(#e2e5ea,#2a3241);--panel:light-dark(#f3f5f8,#151b24);--red:light-dark(#e6261f,#ff5c52);--blue:light-dark(#0a5cff,#5c95ff);--green:light-dark(#00a05a,#33cf88);--slate:light-dark(#5c6676,#a9b2c1);--amber:#ffb400;--onamber:#16120a;--bk:light-dark(#16181d,#343a47)}
@@ -255,7 +255,7 @@ footer ol{font-size:15px}
 <div>
 <h1>Skip List vs rbtree</h1>
 <p class="q">여러 스레드가 동시에 쓰면, 누가 더 잘 버틸까?</p>
-<p class="lede">커널의 rbtree는 보통 트리 전체에 락 하나를 건다. 우리는 노드마다 락을 거는 skip list를 커널 모듈로 직접 만들고, 스레드를 1개에서 8개로 늘려 가며 누가 더 많이 처리하는지 잰다.</p>
+<p class="lede">커널의 rbtree는 보통 트리 전체에 락 하나를 건다. 우리는 노드마다 락을 거는 skip list를 커널 모듈로 직접 만들고, 스레드 수를 늘려 가며 누가 더 많이 처리하는지 잰다.</p>
 </div>
 <dl class="facts">
 <div><dt>과제 유형</dt><dd>커널 소스 성능 개선 · 자료구조</dd></div>
@@ -335,10 +335,10 @@ footer ol{font-size:15px}
 
 <section class="band" id="lineup"><div class="wrap">
 <div class="sh"><h2>구현 5개를 같은 측정 틀에서 잰다</h2>
-<p>발표의 줄거리는 세 정거장이다. 전부 잠그는 rbtree, 읽기만 락 없이 하는 maple tree, 쓰기까지 동시에 하는 skip list v2. 나머지 둘은 공정한 비교를 위한 기준이다.</p></div>
+<p>발표의 줄거리는 세 정거장이다. 전부 잠그는 rbtree, 읽기만 락 없이 하는 xarray, 쓰기까지 동시에 하는 skip list v2. 나머지 둘은 공정한 비교를 위한 기준이다.</p></div>
 <div class="story">
 <div class="stn" style="color:var(--red)"><i></i><b>rbtree + 락</b><span>전부 잠금</span></div>
-<div class="stn" style="color:var(--green)"><i></i><b>maple tree</b><span>읽기만 락 없음</span></div>
+<div class="stn" style="color:var(--green)"><i></i><b>xarray</b><span>읽기만 락 없음</span></div>
 <div class="stn" style="color:var(--blue)"><i></i><b>skip list v2</b><span>쓰기도 동시</span></div>
 <span class="tok" aria-hidden="true"></span>
 </div>
@@ -348,17 +348,18 @@ footer ol{font-size:15px}
 <tr><td><span class="nm"><span class="dot" style="background:var(--red)"></span>rbtree + spinlock</span></td><td><span class="n">안 됨</span></td><td><span class="n">안 됨</span></td><td>기준선. 커널이 보통 쓰는 방식</td><td>A</td></tr>
 <tr><td><span class="nm"><span class="dot" style="background:var(--red)"></span>rbtree + rwlock</span></td><td><span class="y">됨</span></td><td><span class="n">안 됨</span></td><td>탐색 위주 조건에서 공정한 기준</td><td>A</td></tr>
 <tr><td><span class="nm"><span class="dot" style="background:var(--slate)"></span>skip list v1 (락 1개)</span></td><td><span class="n">안 됨</span></td><td><span class="n">안 됨</span></td><td>대조군. rbtree와 락은 같고 구조만 다름</td><td>B</td></tr>
-<tr><td><span class="nm"><span class="dot" style="background:var(--green)"></span>maple tree</span></td><td><span class="y">됨 (RCU)</span></td><td><span class="n">안 됨 (락 1개)</span></td><td>커널의 최신 답. 6.1부터 VMA 관리에 쓴다</td><td>D</td></tr>
+<tr><td><span class="nm"><span class="dot" style="background:var(--green)"></span>xarray</span></td><td><span class="y">됨 (RCU)</span></td><td><span class="n">안 됨 (락 1개)</span></td><td>커널이 페이지 캐시에 쓰는 구조. 읽기만 락 없이 한다</td><td>D</td></tr>
 <tr class="core"><td><span class="nm"><span class="dot" style="background:var(--blue)"></span>skip list v2 (노드별 락) <span class="star">핵심</span></span></td><td><span class="y">됨 (락 없이)</span></td><td><span class="y">됨 (다른 구간이면)</span></td><td>우리의 기여</td><td>C</td></tr>
 </tbody></table></div>
 <p class="small mute" style="margin-top:10px">v3(RCU로 탐색하는 skip list)는 여유가 있을 때만 D가 시도한다.</p>
+<p class="small mute"><b>xarray와 스레드 수 1·2·4는 제안이다.</b> 강성준의 VM은 커널 5.4, vCPU 4개다. 5.4에는 maple tree(6.1부터)가 없어서 xarray로 바꾸고, 스레드는 4개까지만 재는 안이다. 팀원 VM도 같은지 확인하고 첫 회의에서 확정한다.</p>
 <div class="g2" style="margin-top:24px">
 <div class="card"><h3>v1이 왜 필요한가</h3><p style="margin-top:8px">속도 차이가 자료구조 때문인지 락 때문인지 나눠서 말하기 위해서다.</p>
 <div class="pairs">
 <div class="pair"><span class="chip"><span class="dot" style="background:var(--red)"></span>rbtree</span><span class="mute">↔</span><span class="chip"><span class="dot" style="background:var(--slate)"></span>v1</span><span>락은 같고 구조만 다름 → <b>자료구조 효과</b></span></div>
 <div class="pair"><span class="chip"><span class="dot" style="background:var(--slate)"></span>v1</span><span class="mute">↔</span><span class="chip"><span class="dot" style="background:var(--blue)"></span>v2</span><span>구조는 같고 락만 다름 → <b>락 효과</b></span></div>
 </div></div>
-<div class="card"><h3>maple tree를 왜 넣었나</h3><p style="margin-top:8px">커널은 6.1부터 메모리 영역(VMA) 관리를 rbtree에서 maple tree로 바꿨다. 바로 이 확장성 문제 때문이다. 그런데 maple tree도 쓰기는 락 하나로 줄을 선다.</p><p style="margin:0">그래서 "옛날 방식인 rbtree만 이긴 것 아니냐"는 질문을 막고, v2의 차별점을 <b>쓰기도 동시에 된다</b>로 좁힐 수 있다.</p></div>
+<div class="card"><h3>xarray를 왜 넣었나</h3><p style="margin-top:8px">커널도 읽기가 몰리는 곳에서는 락을 피한다. 페이지 캐시에 쓰는 xarray는 읽기를 RCU로 락 없이 한다. 그런데 xarray도 쓰기는 락 하나로 줄을 선다.</p><p>그래서 "옛날 방식인 rbtree만 이긴 것 아니냐"는 질문을 막고, v2의 차별점을 <b>쓰기도 동시에 된다</b>로 좁힐 수 있다.</p><p class="small mute">원래는 maple tree를 넣으려 했다. 커널이 6.1부터 메모리 영역(VMA) 관리를 rbtree에서 maple tree로 바꿨기 때문이다. 커널 5.4에는 없어서 락 구조가 같은 xarray로 바꿨고, maple tree는 관련 연구로만 소개한다.</p><p class="small mute" style="margin:0">주의할 점: xarray는 키가 촘촘한 정수일 때 트리가 낮아서 1스레드 속도부터 빠를 수 있다. 그래서 절대값과 함께, 스레드를 늘렸을 때 얼마나 오르는지를 본다.</p></div>
 </div>
 </div></section>
 
@@ -374,12 +375,12 @@ footer ol{font-size:15px}
 </div>
 <div>
 <ol class="hyp">
-<li><span class="h">1</span><div><b>확장성</b>스레드를 1개에서 8개로 늘리면 v2 처리량이 오른다. rbtree + spinlock은 거의 평평하다.</div></li>
-<li><span class="h">2</span><div><b>쓰기 동시성</b>쓰기 비율이 높을수록 v2와 maple tree의 차이가 벌어진다. 왼쪽 버튼으로 비율을 바꿔 보면 보인다.</div></li>
+<li><span class="h">1</span><div><b>확장성</b>스레드를 늘릴수록 v2 처리량이 오른다. rbtree + spinlock은 거의 평평하다.</div></li>
+<li><span class="h">2</span><div><b>쓰기 동시성</b>쓰기 비율이 높을수록 v2와 xarray의 차이가 벌어진다. 왼쪽 버튼으로 비율을 바꿔 보면 보인다.</div></li>
 <li><span class="h">3</span><div><b>범위 탐색</b>스캔이 도는 동안 rbtree는 쓰기가 멈추고, v2는 계속 쓴다.</div></li>
 <li><span class="h">4</span><div><b>정직한 예상</b>스레드 1개에서는 rbtree가 이긴다. skip list가 포인터를 더 많이 따라가기 때문이다.</div></li>
 </ol>
-<div class="card" style="margin-top:20px"><h4>가설이 맞았다고 말할 기준</h4><p style="margin:8px 0 0">쓰기가 섞인 조건에서 스레드가 늘수록 v2가 rbtree와 maple tree를 앞서면 성립한다. 지는 조건이 나와도 그것 역시 결과다. 이동 노드 수와 재시도 횟수로 이유를 붙인다.</p></div>
+<div class="card" style="margin-top:20px"><h4>가설이 맞았다고 말할 기준</h4><p style="margin:8px 0 0">쓰기가 섞인 조건에서 스레드가 늘수록 v2가 rbtree와 xarray를 앞서면 성립한다. 지는 조건이 나와도 그것 역시 결과다. 이동 노드 수와 재시도 횟수로 이유를 붙인다.</p></div>
 </div>
 </div>
 <div class="g2" style="margin-top:20px">
@@ -407,14 +408,14 @@ footer ol{font-size:15px}
 <p>모든 구현을 같은 VM, 같은 조건에서 돌린다. VM이라 값이 흔들리므로 조건마다 5번 반복해 평균과 편차를 낸다.</p></div>
 <div class="vars">
 <div class="card"><h4>원소 수</h4><div class="chips"><span class="chip">1만</span><span class="chip">10만</span><span class="chip">100만</span></div></div>
-<div class="card"><h4>스레드 수</h4><div class="chips"><span class="chip">1</span><span class="chip">2</span><span class="chip">4</span><span class="chip">8</span></div><p class="small mute" style="margin:10px 0 0">VM의 vCPU 수까지만 늘린다</p></div>
+<div class="card"><h4>스레드 수</h4><div class="chips"><span class="chip">1</span><span class="chip">2</span><span class="chip">4</span></div><p class="small mute" style="margin:10px 0 0">실험 VM의 vCPU가 4개라 4까지. 8개로 늘릴 수 있으면 8도 잰다</p></div>
 <div class="card"><h4>작업 비율 (탐색·삽입·삭제)</h4><div class="chips"><span class="chip">100·0·0</span><span class="chip">90·5·5</span><span class="chip">50·25·25</span><span class="chip">0·50·50</span></div></div>
 </div>
 <div class="figs">
-<div class="big"><b>48</b><span>조건 (3 × 4 × 4)</span></div>
-<div class="big"><b>1,200</b><span>번 실행 (구현 5개 × 반복 5번)</span></div>
-<div class="big"><b>약 1시간</b><span>한 번에 3초씩 돌릴 때</span></div>
-<div class="big"><b>+1</b><span>범위 탐색 실험: 스캔 1 + 쓰기 1·2·4, 스캔 길이 100·1,000</span></div>
+<div class="big"><b>36</b><span>조건 (3 × 3 × 4)</span></div>
+<div class="big"><b>900</b><span>번 실행 (구현 5개 × 반복 5번)</span></div>
+<div class="big"><b>약 45분</b><span>한 번에 3초씩 돌릴 때</span></div>
+<div class="big"><b>+1</b><span>범위 탐색 실험: 스캔 1 + 쓰기 1·2·3, 스캔 길이 100·1,000</span></div>
 </div>
 <div class="g2">
 <div class="card"><h3>재는 값</h3><ul style="margin-top:10px">
@@ -428,7 +429,8 @@ footer ol{font-size:15px}
 <li><b>"삽입만" 조건을 뺐다.</b> 키 범위가 정해져 있어 금방 다 차고, 그 뒤 삽입은 "이미 있음"으로 실패한다. 결국 탐색을 재게 된다.</li>
 <li><b>삽입과 삭제를 같은 비율로 섞는다.</b> 원소 수가 일정하게 유지되고, 과제 요건인 삭제 성능도 함께 잰다.</li>
 <li><b>범위 탐색을 넣었다.</b> 과제 요건인 순회(traverse)를 재고, 락 범위 차이가 가장 크게 드러난다.</li>
-<li><b>스레드를 8개까지 늘렸다.</b> 4개까지로는 확장성 곡선이 약하다.</li>
+<li><b>스레드는 4개까지 잰다 (제안).</b> 8개까지 늘리려 했지만 실험 VM의 vCPU가 4개다. vCPU를 8개로 늘릴 수 있으면 8도 잰다.</li>
+<li><b>maple tree 대신 xarray를 쓴다 (제안).</b> maple tree는 커널 6.1부터 있는데 실험 커널은 5.4다.</li>
 </ul></div>
 </div>
 </div></section>
@@ -455,7 +457,7 @@ footer ol{font-size:15px}
 <g text-anchor="middle">
 <text x="114" y="263" style="font-size:15px;font-weight:800">rbtree + 락</text><text x="114" y="288" class="lvl">A · bench_rb.ko</text>
 <text x="297" y="263" style="font-size:15px;font-weight:800">skip list v1</text><text x="297" y="288" class="lvl">B · bench_sl1.ko</text>
-<text x="480" y="263" style="font-size:15px;font-weight:800">maple tree</text><text x="480" y="288" class="lvl">D · bench_mt.ko</text>
+<text x="480" y="263" style="font-size:15px;font-weight:800">xarray</text><text x="480" y="288" class="lvl">D · bench_xa.ko</text>
 <text x="663" y="263" style="font-size:15px;font-weight:800;fill:var(--blue)">skip list v2</text><text x="663" y="288" class="lvl">C · bench_sl2.ko</text>
 <text x="846" y="263" style="font-size:15px;font-weight:800;fill:var(--mute)">v3 RCU (선택)</text><text x="846" y="288" class="lvl">D · bench_rcu.ko</text>
 </g>
@@ -475,7 +477,7 @@ footer ol{font-size:15px}
 <p class="small mute" style="margin-top:8px">반환값 규칙은 제안이다. 첫 회의에서 확정한다.</p></div>
 <div><h3 style="margin-bottom:6px">측정 틀 파라미터 (제안)</h3>
 <div class="scroll"><table class="stack"><thead><tr><th>이름</th><th>값</th><th>뜻</th></tr></thead><tbody>
-<tr><td><code>nthreads</code></td><td>1 · 2 · 4 · 8</td><td>워커 스레드 수</td></tr>
+<tr><td><code>nthreads</code></td><td>1 · 2 · 4</td><td>워커 스레드 수</td></tr>
 <tr><td><code>nkeys</code></td><td>1만 · 10만 · 100만</td><td>미리 채울 원소 수</td></tr>
 <tr><td><code>search_pct</code> <code>insert_pct</code></td><td>0~100</td><td>삭제 비율은 나머지</td></tr>
 <tr><td><code>scan_threads</code></td><td>0 · 1</td><td>범위 탐색 스레드 수</td></tr>
@@ -516,8 +518,8 @@ footer ol{font-size:15px}
 <li>READ_ONCE · WRITE_ONCE, smp_store_release · smp_load_acquire (memory-barriers.txt)</li>
 <li>ARM64가 x86보다 메모리 접근 순서를 자유롭게 바꾸는 이유</li>
 <li>락 순서(아래층 → 위층), cpu_relax로 기다리기</li></ul></div>
-<div class="card"><h4><span class="dot" style="background:var(--green)"></span>D 종주원 · 실험과 maple tree</h4><ul>
-<li>maple tree API: mtree_insert · mtree_load · mtree_erase · mt_for_each (core-api/maple_tree.rst)</li>
+<div class="card"><h4><span class="dot" style="background:var(--green)"></span>D 종주원 · 실험과 xarray</h4><ul>
+<li>xarray API: xa_insert · xa_load · xa_erase · xa_find (core-api/xarray.rst). xa_insert는 키가 이미 있으면 -EBUSY를 돌려준다</li>
 <li>RCU 기초 (RCU/whatisRCU.rst)</li>
 <li>셸 자동화: dmesg -C, set -e, rmmod 실패 확인</li>
 <li>matplotlib 오차 막대, 관련 연구 정리</li></ul></div>
@@ -534,12 +536,12 @@ footer ol{font-size:15px}
 <ul>
 <li>PM: 첫 회의 진행, 저장소와 브랜치 보호, 주 1회 15분 점검</li>
 <li><b>모든 PR 확인과 merge</b> (내 PR은 이은찬이 확인)</li>
-<li>측정 틀: 파라미터, 미리 채우기, kthread N개 동시 출발, 1~8 스레드와 CPU 고정</li>
+<li>측정 틀: 파라미터, 미리 채우기, kthread N개 동시 출발, 1~4 스레드와 CPU 고정</li>
 <li>부하: 탐색·삽입·삭제 비율 섞기, 범위 탐색 스레드</li>
 <li>rbtree + spinlock / rwlock, range 포함</li>
 <li>모든 구현 통합, 정합성 테스트 실행</li>
 </ul>
-<dl class="rk"><dt>산출물</dt><dd><code>harness/harness.c</code> <code>ds/rbtree_lock.c</code> <code>Makefile</code></dd><dt>완료 기준</dt><dd>bench_rb.ko가 1·2·4·8 스레드에서 RESULT를 출력하고, 같은 조건 5번의 편차가 10% 안팎이며, rmmod 후 누수가 없다</dd><dt>발표</dt><dd>실험 환경과 방법</dd></dl>
+<dl class="rk"><dt>산출물</dt><dd><code>harness/harness.c</code> <code>ds/rbtree_lock.c</code> <code>Makefile</code></dd><dt>완료 기준</dt><dd>bench_rb.ko가 1·2·4 스레드에서 RESULT를 출력하고, 같은 조건 5번의 편차가 10% 안팎이며, rmmod 후 누수가 없다</dd><dt>발표</dt><dd>실험 환경과 방법</dd></dl>
 </article>
 <article class="role" style="--c:var(--slate)">
 <div class="rh"><span class="rl">B</span><div><h3>이은찬</h3><p>skip list v1 + 정합성 검증</p></div></div>
@@ -564,21 +566,21 @@ footer ol{font-size:15px}
 <dl class="rk"><dt>산출물</dt><dd><code>ds/skiplist_v2.c</code> <code>docs/v2-design.md</code></dd><dt>완료 기준</dt><dd>같은 키가 겹치는 스트레스 테스트를 10번 연속 통과하고, 개수가 v1과 일치한다</dd><dt>발표</dt><dd>v2 설계: 락 범위, 검증, 지연 해제</dd></dl>
 </article>
 <article class="role" style="--c:var(--green)">
-<div class="rh"><span class="rl">D</span><div><h3>종주원</h3><p>실험 · 분석 · 발표 총괄 + maple tree</p></div></div>
+<div class="rh"><span class="rl">D</span><div><h3>종주원</h3><p>실험 · 분석 · 발표 총괄 + xarray</p></div></div>
 <ul>
 <li>run_bench.sh: 조건 순회 → insmod → RESULT 추출 → rmmod → CSV</li>
 <li>plot.py: 스레드 수별 처리량, 평균 ± 편차 오차 막대</li>
-<li>maple tree 구현: mtree_insert · load · erase, range는 mt_for_each</li>
-<li>관련 연구: Pugh, Herlihy, 커널의 maple tree 전환</li>
+<li>xarray 구현: xa_insert · xa_load · xa_erase, range는 xa_find · xa_find_after로 센다</li>
+<li>관련 연구: Pugh, Herlihy, 커널의 maple tree 전환 (소개만, 구현은 안 한다)</li>
 <li>발표 흐름과 리허설, (선택) v3 RCU</li>
 </ul>
-<dl class="rk"><dt>산출물</dt><dd><code>scripts/</code> <code>ds/maple.c</code> <code>results/</code> 슬라이드</dd><dt>완료 기준</dt><dd>스크립트 한 번 실행으로 전체 측정, CSV, 그래프가 나온다</dd><dt>발표</dt><dd>도입, 관련 연구, 결과, 결론</dd></dl>
+<dl class="rk"><dt>산출물</dt><dd><code>scripts/</code> <code>ds/xarray.c</code> <code>results/</code> 슬라이드</dd><dt>완료 기준</dt><dd>스크립트 한 번 실행으로 전체 측정, CSV, 그래프가 나온다</dd><dt>발표</dt><dd>도입, 관련 연구, 결과, 결론</dd></dl>
 </article>
 </div>
 <div class="card" style="margin-top:24px"><h3>발표 10분 배분</h3>
 <div class="pres">
 <div class="pr"><span>문제 제기: 전역 락의 한계와 가설<span class="who"><i class="dot" style="background:var(--green)"></i></span></span><span class="track"><span class="bar" style="width:40%;background:var(--ink)"></span></span><span class="hv">1:00</span></div>
-<div class="pr"><span>배경: rbtree, skip list, maple tree<span class="who"><i class="dot" style="background:var(--slate)"></i><i class="dot" style="background:var(--green)"></i></span></span><span class="track"><span class="bar" style="width:60%;background:var(--ink)"></span></span><span class="hv">1:30</span></div>
+<div class="pr"><span>배경: rbtree, skip list, xarray<span class="who"><i class="dot" style="background:var(--slate)"></i><i class="dot" style="background:var(--green)"></i></span></span><span class="track"><span class="bar" style="width:60%;background:var(--ink)"></span></span><span class="hv">1:30</span></div>
 <div class="pr"><span>설계: v1 → v2<span class="who"><i class="dot" style="background:var(--blue)"></i></span></span><span class="track"><span class="bar" style="width:100%;background:var(--blue)"></span></span><span class="hv">2:30</span></div>
 <div class="pr"><span>실험 환경과 방법<span class="who"><i class="dot" style="background:var(--red)"></i></span></span><span class="track"><span class="bar" style="width:40%;background:var(--ink)"></span></span><span class="hv">1:00</span></div>
 <div class="pr"><span>결과: 스레드 수별, 작업 비율별<span class="who"><i class="dot" style="background:var(--green)"></i></span></span><span class="track"><span class="bar" style="width:80%;background:var(--ink)"></span></span><span class="hv">2:00</span></div>
@@ -621,7 +623,7 @@ footer ol{font-size:15px}
 <text x="320" y="111">측정 틀 (더미부터)</text><text x="480" y="111">rbtree</text>
 <text x="320" y="191">v1</text><text x="480" y="191">정합성 검사</text>
 <text x="320" y="271">v2 설계</text><text x="480" y="271" style="font-weight:800">v2 구현·안정화</text>
-<text x="320" y="351">실험 스크립트</text><text x="480" y="351">maple tree</text>
+<text x="320" y="351">실험 스크립트</text><text x="480" y="351">xarray</text>
 <text x="640" y="318">통합·PR 확인 (A)</text>
 <text x="800" y="233">최종 측정 (VM 1대)</text><text x="940" y="233">그래프·발표</text>
 </g>
@@ -646,7 +648,7 @@ footer ol{font-size:15px}
 <p class="legend"><span class="sw"><i style="background:var(--amber);opacity:.6;height:10px"></i>임계 경로</span><span class="sw"><i style="background:var(--amber);width:14px;height:14px;border-radius:50%"></i>병목 번호</span><span class="sw"><i style="height:0;border-top:2px dashed var(--mute);border-radius:0"></i>의존 관계</span><span class="phone-only">좁은 화면에서는 그림을 옆으로 밀어서 본다.</span></p>
 <div class="bns">
 <div class="bn"><span class="num">1</span><div><h4>ds_ops 합의 <span class="sev h">높음 · 짧음</span></h4><dl><dt>왜 막히나</dt><dd>인터페이스가 정해져야 각자 코드를 쓰기 시작할 수 있다.</dd><dt>기다리는 사람</dt><dd>전원</dd><dt>푸는 법</dt><dd>회의 한 번에 시그니처뿐 아니라 규칙(반환값, 키 범위, range의 의미)까지 확정한다. 아래 안건을 그대로 쓴다.</dd></dl></div></div>
-<div class="bn"><span class="num">2</span><div><h4>측정 틀 (A) <span class="sev h">높음</span></h4><dl><dt>왜 막히나</dt><dd>v1·v2·maple tree 모두 harness에 끼워야 돌려 볼 수 있고, D의 스크립트도 harness 출력을 읽는다.</dd><dt>기다리는 사람</dt><dd>B, C, D</dd><dt>푸는 법</dt><dd>A가 아무 일도 안 하는 더미 구현으로 harness를 먼저 올린다. 기능은 삽입·탐색 → 삭제 섞기 → 스캔 스레드 순서로 덧붙인다. 그동안 다른 사람은 각자 작은 테스트 모듈로 혼자 검증한다.</dd></dl></div></div>
+<div class="bn"><span class="num">2</span><div><h4>측정 틀 (A) <span class="sev h">높음</span></h4><dl><dt>왜 막히나</dt><dd>v1·v2·xarray 모두 harness에 끼워야 돌려 볼 수 있고, D의 스크립트도 harness 출력을 읽는다.</dd><dt>기다리는 사람</dt><dd>B, C, D</dd><dt>푸는 법</dt><dd>A가 아무 일도 안 하는 더미 구현으로 harness를 먼저 올린다. 기능은 삽입·탐색 → 삭제 섞기 → 스캔 스레드 순서로 덧붙인다. 그동안 다른 사람은 각자 작은 테스트 모듈로 혼자 검증한다.</dd></dl></div></div>
 <div class="bn max"><span class="num">3</span><div><h4>v2 구현·안정화 (C) <span class="sev x">가장 큼</span></h4><dl><dt>왜 막히나</dt><dd>가장 어렵고, 핵심 결과와 최종 측정이 전부 v2를 기다린다.</dd><dt>기다리는 사람</dt><dd>최종 측정, 발표의 결과 파트</dd><dt>푸는 법</dt><dd>구현 전에 의사코드와 락 순서 문서를 B와 리뷰한다. 탐색 → 삽입 → 삭제 순서로 작은 PR을 올린다. C에게 다른 일을 얹지 않는다. 끝내 불안정하면 v1 결과 + v2 설계·부분 결과 + 막힌 이유 분석으로 발표한다.</dd></dl></div></div>
 <div class="bn"><span class="num">4</span><div><h4>정합성 검사 함수 (B) <span class="sev m">중간</span></h4><dl><dt>왜 막히나</dt><dd>v2 스트레스 테스트가 이 함수로 통과 여부를 판정한다.</dd><dt>기다리는 사람</dt><dd>C</dd><dt>푸는 법</dt><dd>B가 노드 구조체와 검사 함수부터 공개한다. v1이 완성되기 전이어도 된다. C는 같은 뼈대 위에 필드만 추가한다.</dd></dl></div></div>
 <div class="bn"><span class="num">5</span><div><h4>A에게 몰린 PR 확인과 통합 <span class="sev h">높음</span></h4><dl><dt>왜 막히나</dt><dd>모든 PR을 A가 확인하고 merge한다. A는 측정 틀, rbtree, 통합도 맡고 있어서 A가 바쁘면 전원의 PR이 기다린다.</dd><dt>기다리는 사람</dt><dd>전원</dd><dt>푸는 법</dt><dd>PR은 단계 하나씩 작게 올리고, PR 템플릿 체크리스트(빌드, RESULT 출력, 검사 함수, 코딩 스타일)를 채워서 올린다. A는 자기 코드보다 리뷰 요청을 먼저 처리한다. A 본인의 PR은 이은찬이 확인한다.</dd></dl></div></div>
@@ -660,6 +662,8 @@ footer ol{font-size:15px}
 <li><label><input type="checkbox" id="ag4"><span><b>키 범위</b>: u64, 센티넬로 쓸 0과 U64_MAX는 제외할지</span></label></li>
 <li><label><input type="checkbox" id="ag5"><span><b>init · destroy</b>는 한 스레드에서만 호출</span></label></li>
 <li><label><input type="checkbox" id="ag6"><span><b>RESULT 형식</b>과 최종 측정에 쓸 VM 한 대 지정</span></label></li>
+<li><label><input type="checkbox" id="ag7"><span><b>maple tree 대신 xarray</b>: 커널 5.4에는 maple tree가 없다. 팀원 VM의 커널 버전도 확인</span></label></li>
+<li><label><input type="checkbox" id="ag8"><span><b>스레드 수</b>: 1·2·4로 줄일지, VM의 vCPU를 8개로 늘릴지</span></label></li>
 </ul>
 <p class="small mute" style="margin:10px 0 0">체크 표시는 지금 보는 브라우저에만 저장된다.</p></div>
 </div></section>
@@ -669,7 +673,7 @@ footer ol{font-size:15px}
 <div class="g3 rules">
 <div class="card"><h3>Git</h3><ul>
 <li><code>main</code>에 직접 push하지 않는다</li>
-<li>브랜치는 <code>feat/harness</code>, <code>feat/sl-v2</code>, <code>feat/maple</code>처럼</li>
+<li>브랜치는 <code>feat/harness</code>, <code>feat/sl-v2</code>, <code>feat/xarray</code>처럼</li>
 <li>PR → 강성준이 확인·approve → merge (강성준의 PR은 이은찬)</li>
 <li>빌드 산출물(<code>*.o</code>, <code>*.ko</code>)은 커밋하지 않는다</li>
 <li>커밋 메시지는 <code>영역: 무엇을</code></li></ul></div>
@@ -695,7 +699,7 @@ footer ol{font-size:15px}
 <li>M. Herlihy, Y. Lev, V. Luchangco, N. Shavit, A Simple Optimistic Skiplist Algorithm, SIROCCO 2007</li>
 <li>M. Herlihy, N. Shavit, The Art of Multiprocessor Programming, 14장</li>
 <li>Robert Love, Linux Kernel Development 3판, 6장 · 9~10장</li>
-<li>커널 문서: core-api/rbtree.rst, core-api/maple_tree.rst, memory-barriers.txt, RCU/whatisRCU.rst</li></ol></div>
+<li>커널 문서: core-api/rbtree.rst, core-api/xarray.rst, memory-barriers.txt, RCU/whatisRCU.rst</li></ol></div>
 </div></footer>
 
 <script>
@@ -964,27 +968,27 @@ redrawers.push(()=>{if(!run)still();});
 /* expected throughput chart */
 try{
 const box=$('#chart'),svg=box.querySelector('svg'),title=$('#chartTitle');
-const TH=[1,2,4,8];
+const TH=[1,2,4];
 const SER=[
  {k:'rbs',n:'rbtree + spin',s:'rb·spin',c:'var(--red)',w:3},
  {k:'rbw',n:'rbtree + rw',s:'rb·rw',c:'var(--red)',w:3,d:'7 6'},
  {k:'v1',n:'skip v1',s:'v1',c:'var(--slate)',w:3},
- {k:'mt',n:'maple tree',s:'maple',c:'var(--green)',w:3},
+ {k:'xa',n:'xarray',s:'xarray',c:'var(--green)',w:3},
  {k:'v2',n:'skip v2',s:'v2',c:'var(--blue)',w:5}
 ];
 const MIX={
- r:{t:'탐색만 하면 maple tree와 rwlock도 함께 오른다',d:{rbs:[1,1.04,1.07,1.08],rbw:[.98,1.8,3.1,5.2],v1:[.8,.83,.85,.86],mt:[1.08,2.1,4,7.4],v2:[.8,1.55,3,5.7]}},
- a:{t:'쓰기가 10%만 섞여도 rwlock은 꺾인다',d:{rbs:[1,1.03,1.04,1.05],rbw:[.97,1.4,1.85,2.1],v1:[.8,.82,.83,.84],mt:[1.04,1.9,3.3,5.1],v2:[.8,1.5,2.9,5.4]}},
- b:{t:'쓰기가 절반이면 v2만 계속 오른다',d:{rbs:[1,1,1,.99],rbw:[.95,.98,1,1],v1:[.78,.79,.8,.8],mt:[.92,1.1,1.25,1.3],v2:[.78,1.45,2.7,4.8]}},
- c:{t:'쓰기만 하면 maple tree도 한 줄로 선다',d:{rbs:[1,.98,.96,.94],rbw:[.95,.93,.91,.9],v1:[.78,.77,.76,.75],mt:[.82,.83,.84,.84],v2:[.75,1.4,2.6,4.5]}}
+ r:{t:'탐색만 하면 xarray와 rwlock도 함께 오른다',d:{rbs:[1,1.04,1.07],rbw:[.98,1.8,3.1],v1:[.8,.83,.85],xa:[1.08,2.1,4],v2:[.8,1.55,3]}},
+ a:{t:'쓰기가 10%만 섞여도 rwlock은 꺾인다',d:{rbs:[1,1.03,1.04],rbw:[.97,1.4,1.85],v1:[.8,.82,.83],xa:[1.04,1.9,3.3],v2:[.8,1.5,2.9]}},
+ b:{t:'쓰기가 절반이면 v2만 계속 오른다',d:{rbs:[1,1,1],rbw:[.95,.98,1],v1:[.78,.79,.8],xa:[.92,1.1,1.25],v2:[.78,1.45,2.7]}},
+ c:{t:'쓰기만 하면 xarray도 한 줄로 선다',d:{rbs:[1,.98,.96],rbw:[.95,.93,.91],v1:[.78,.77,.76],xa:[.82,.83,.84],v2:[.75,1.4,2.6]}}
 };
 let mix='b';
 const draw=anim=>{
  const W=box.clientWidth,H=box.clientHeight;if(!W||!H)return;
- const narrow=W<520,L=narrow?10:18,R=narrow?62:112,T=26,B=46,ymax=8;
+ const narrow=W<520,L=narrow?10:18,R=narrow?62:112,T=26,B=46,ymax=4.5;
  const x=i=>L+i*(W-L-R)/(TH.length-1),y=v=>T+(H-T-B)*(1-v/ymax);
  let s='<defs><clipPath id="cclip"><rect id="cclipR" x="0" y="0" width="'+(anim&&!RM?0:W)+'" height="'+H+'"/></clipPath></defs>';
- for(const g of [2,4,6,8])s+='<line x1="'+L+'" x2="'+(W-R)+'" y1="'+y(g).toFixed(1)+'" y2="'+y(g).toFixed(1)+'" stroke="var(--rule)"/>';
+ for(const g of [1,2,3,4])s+='<line x1="'+L+'" x2="'+(W-R)+'" y1="'+y(g).toFixed(1)+'" y2="'+y(g).toFixed(1)+'" stroke="var(--rule)"/>';
  s+='<line x1="'+L+'" x2="'+(W-R)+'" y1="'+y(0).toFixed(1)+'" y2="'+y(0).toFixed(1)+'" stroke="var(--ink)" stroke-width="1.5"/>';
  TH.forEach((t,i)=>{s+='<text class="lvl" x="'+x(i).toFixed(1)+'" y="'+(H-B+22)+'" text-anchor="middle">'+t+'</text>';});
  s+='<text class="lvl" x="'+(W-R)+'" y="'+(H-4)+'" text-anchor="end">스레드 수 →</text>';
@@ -995,7 +999,7 @@ const draw=anim=>{
   const v=MIX[mix].d[sr.k],p=v.map((val,i)=>[x(i),y(val)]);
   g+='<polyline points="'+p.map(q=>q[0].toFixed(1)+','+q[1].toFixed(1)).join(' ')+'" fill="none" stroke="'+sr.c+'" stroke-width="'+sr.w+'" stroke-linejoin="round" stroke-linecap="round"'+(sr.d?' stroke-dasharray="'+sr.d+'"':'')+'/>';
   for(const q of p)g+='<circle cx="'+q[0].toFixed(1)+'" cy="'+q[1].toFixed(1)+'" r="'+(sr.k==='v2'?5:3.5)+'" fill="'+sr.c+'"/>';
-  ends.push({y:p[3][1],sr});
+  ends.push({y:p[p.length-1][1],sr});
  }
  s+='<g clip-path="url(#cclip)">'+g+'</g>';
  ends.sort((a,b)=>a.y-b.y);
