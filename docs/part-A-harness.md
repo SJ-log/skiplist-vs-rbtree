@@ -8,11 +8,16 @@
 모든 구현을 같은 조건에서 공정하게 재는 **측정 틀(harness)**과 비교 기준인 **rbtree(spinlock·rwlock)**를 만든다.
 다른 사람의 결과가 전부 이 틀을 거친다. 팀 병목 중 ② 측정 틀과 ⑤ PR 확인·통합 쏠림이 A에게 걸려 있다.
 
-## 지금 상태 (2026-11-22 기준)
+## 지금 상태 (2026-11-23 기준)
 
-- 저장소: README, TEAM_GUIDE, CLAUDE.md, Makefile(전부 주석), `include/ds_ops.h` 초안, `docs/`
-- `harness/`, `ds/`, `tests/`, `scripts/`는 아직 없다
-- 첫 회의(ds_ops 확정)는 아직 안 했다
+- `main`에 들어간 것: PR #1 팀 페이지와 규칙, PR #2 커널 5.4에 맞춘 계획 수정(xarray, 스레드 1·2·4), PR #3 1단계(`harness/harness.c`, `ds/dummy.c` → `bench_dummy.ko`)
+- **1단계 완료.** 더미 측정값(vCPU 4): 1스레드 2.75억, 2스레드 5.33억(1.93배), 4스레드 10.44억 ops/s(3.79배). 이 곡선이 이 VM에서 가능한 최대 확장이므로 다른 구현의 확장성은 이 값과 비교한다
+- 워커 구조체는 128바이트로 정렬한다 (`BENCH_CACHE_ALIGN`). Apple Silicon의 캐시 라인이 128바이트라서 `____cacheline_aligned_in_smp`(arm64에서 64바이트)로는 false sharing이 났다 (더미 4스레드 3.16배 → 3.79배)
+- 경과 시간은 3초보다 0.05~0.2초 길게 나온다 (타이머가 올림해서 깨우는 것으로 보인다). 처리량은 반드시 `elapsed_ns`로 나눈다
+- 첫 회의(ds_ops 확정)는 아직 안 했다 (2026-11-24 예정)
+- 아직 안 한 PM 일: 협업자 초대, `main` 보호 규칙
+- 다음 할 일: 회의 결과를 `include/ds_ops.h`에 반영하는 PR (이때 `BENCH_CACHE_ALIGN`도 `ds_ops.h`로 옮겨 모든 구현이 같이 쓴다) → 2단계(작업 비율)
+- `tests/`, `scripts/`는 아직 없다
 
 ## 내 VM 정보 (2026-11-23 확인)
 
@@ -48,15 +53,16 @@
 - [ ] 회의 결과를 `include/ds_ops.h`에 반영하는 PR (`range` 추가, 반환값 주석)
 - [ ] GitHub: 협업자 초대, `main` 보호 규칙 (Settings → Branches: PR 필수, 승인 1명)
   - `.github/CODEOWNERS`가 모든 PR의 리뷰 요청을 나에게 보낸다
-  - "Require review from Code Owners"는 켜지 않는다. 켜면 내 PR을 아무도 approve할 수 없다
+  - "Do not allow bypassing the above settings"는 켜지 않는다. 꺼 두면 저장소 관리자인 내 PR은 승인 없이 merge할 수 있다
+  - "Require review from Code Owners"를 켜면 팀원의 PR에 내 승인이 꼭 필요해진다 (선택)
 - [ ] **모든 PR 확인과 merge**: 내 코드 작업보다 리뷰 요청을 먼저 처리한다. 확인 기준은 PR 템플릿 체크리스트
 - [ ] 주 1회 15분 점검: 각자 "끝낸 것 / 막힌 것 / 다음 할 것"만
 
 ## 1~6. 구현 단계
 
-순서대로 진행하고 단계마다 `feat/harness` 브랜치에서 PR을 올린다. 내 PR은 이은찬이 확인한다 (GitHub은 자기 PR을 approve할 수 없다).
+순서대로 진행하고 단계마다 `feat/harness` 브랜치에서 PR을 올린다. 내 PR은 리뷰 없이 직접 merge한다.
 
-### 1단계 — 더미 구현 + 최소 측정 틀 (병목 ② 해소)
+### 1단계 — 더미 구현 + 최소 측정 틀 (병목 ② 해소) — 완료 (PR #3)
 
 - 파일: `harness/harness.c`, `ds/dummy.c`(아무 일도 안 하는 `ds_ops`), Makefile에 `bench_dummy`
 - 파라미터: `nthreads`, `nkeys`, `duration_ms`
@@ -84,7 +90,7 @@
 
 - `nthreads > num_online_cpus()`면 거부한다 (측정 의미가 없어진다)
 - 워커 i는 CPU `i % num_online_cpus()`에 고정
-- 스레드별 통계 구조체에 `____cacheline_aligned_in_smp`
+- 워커 구조체는 128바이트로 정렬한다 (`BENCH_CACHE_ALIGN`, 1단계에서 반영함). `____cacheline_aligned_in_smp`는 64바이트라 부족하다
 - 1024연산마다 락 밖에서 `cond_resched()`
 
 ### 5단계 — 범위 탐색 스레드
@@ -105,7 +111,7 @@
 RESULT,ds,threads,nkeys,search,insert,remove,scan_len,ops,scan_ops,elapsed_ns
 ```
 
-- 팀 페이지의 제안에서 `scan`을 `scan_len`으로 구체화하고 `scan_ops`를 덧붙인 형태
+- 측정 틀이 실제로 출력하는 형식이고, 팀 페이지에도 같은 형식으로 적었다
 - 처리량 = `ops / elapsed_ns × 1e9`, 평균 지연 ≈ `elapsed_ns × threads / ops`
 
 ## 설계 메모
@@ -119,7 +125,7 @@ struct worker {
 	struct completion done;
 	u64 ops;
 	int id;
-} ____cacheline_aligned_in_smp;
+} __aligned(BENCH_CACHE_ALIGN);   /* 128바이트 */
 
 static DECLARE_COMPLETION(start);   /* 출발 신호: complete_all() */
 static bool stop;                   /* READ_ONCE / WRITE_ONCE */
@@ -174,6 +180,6 @@ spin_unlock(&lock);
 
 ```
 skiplist-vs-rbtree 저장소의 CLAUDE.md와 docs/part-A-harness.md를 읽고,
-feat/harness 브랜치를 만들어 1단계(더미 구현 + 최소 측정 틀)부터 시작해 줘.
+최신 main에서 feat/harness 브랜치를 만들어 "지금 상태"의 다음 할 일부터 이어서 해 줘.
 빌드와 실행은 내 VM에서 하고 결과를 붙여 줄게. VM 정보는 문서의 표에 적어 뒀어.
 ```
