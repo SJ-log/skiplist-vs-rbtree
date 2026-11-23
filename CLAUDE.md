@@ -17,11 +17,13 @@
 
 ## TEAM_GUIDE 이후 바뀐 점
 
-- 구현 5개: rbtree+spinlock, rbtree+rwlock (A) / skip v1 락 1개 (B) / maple tree (D, v3 대신) / skip v2 lazy·노드별 락 (C, 핵심). v3 RCU는 여유 있을 때만 D가
+- 구현 5개: rbtree+spinlock, rbtree+rwlock (A) / skip v1 락 1개 (B) / xarray (D, v3 대신) / skip v2 lazy·노드별 락 (C, 핵심). v3 RCU는 여유 있을 때만 D가
 - `ds_ops`에 `u64 (*range)(u64 lo, u64 hi)` 추가 예정 — [lo, hi] 안의 키 개수. 첫 회의에서 확정하기 전까지는 제안
 - 작업 비율(탐색·삽입·삭제): 100·0·0 / 90·5·5 / 50·25·25 / 0·50·50. "삽입만" 조건은 뺐다 (키가 금방 다 차서 탐색을 재게 됨)
-- 스레드 수 1·2·4·8 (VM의 vCPU 수까지)
-- 범위 탐색 실험 추가: 스캔 스레드 1 + 쓰기 스레드 1·2·4, scan_len 100·1,000
+- 스레드 수 1·2·4 (실험 VM의 vCPU가 4개. 8개로 늘릴 수 있으면 8도 잰다)
+- 범위 탐색 실험 추가: 스캔 스레드 1 + 쓰기 스레드 1·2·3, scan_len 100·1,000
+- 실험 커널은 5.4다 (강성준 VM: 5.4.214, aarch64, vCPU 4, Ubuntu 20.04). 팀원 VM도 같은지는 첫 회의에서 확인한다
+- 커널 5.4 때문에 바꾼 것 (제안, 첫 회의에서 확정): maple tree(6.1부터) → xarray, 스레드 수 1·2·4·8 → 1·2·4, 범위 탐색의 쓰기 스레드 1·2·4 → 1·2·3
 - 분석용 카운터: 연산당 이동 노드 수, v2 검증 실패 재시도 횟수. 컴파일 옵션으로만 켠다
 - PR 확인은 리뷰 짝 대신 강성준(PM)이 전부 맡는다 (강성준의 PR은 이은찬)
 - 날짜 기반 일정 대신 의존 순서로 관리한다. 병목은 `docs/index.html`의 "병목" 섹션 참고
@@ -33,7 +35,7 @@
 | A · PM | 강성준 | 측정 틀(harness), rbtree spin/rw, 통합 |
 | B | 이은찬 | skip v1, 정합성 검사·스트레스 테스트, v2 페어 |
 | C | 이우신 | skip v2 (lazy skip list, 노드별 락) |
-| D | 종주원 | 실험 스크립트·그래프·발표 총괄, maple tree |
+| D | 종주원 | 실험 스크립트·그래프·발표 총괄, xarray |
 
 PR 확인: 모든 PR은 강성준이 확인·merge (강성준의 PR은 이은찬).
 백업 짝: 강성준 ↔ 이은찬, 이우신 ↔ 종주원 — 서로의 파트를 설명할 수 있게 유지
@@ -43,7 +45,7 @@ PR 확인: 모든 PR은 강성준이 확인·merge (강성준의 PR은 이은찬
 ```
 include/ds_ops.h  공통 인터페이스. 각 구현은 struct ds_ops bench_ds 를 하나 정의한다
 harness/          측정 틀 (A)
-ds/               구현: rbtree_lock.c, rbtree_rw.c, skiplist_v1.c, skiplist_v2.c, maple.c
+ds/               구현: rbtree_lock.c, rbtree_rw.c, skiplist_v1.c, skiplist_v2.c, xarray.c
 tests/            정합성 검사 (B)
 scripts/          실험 실행·그래프 (D)
 results/          측정 결과 CSV
@@ -58,6 +60,7 @@ docs/             팀 공유 페이지, 역할별 인수인계
 
 - 빌드·실행은 각자의 Ubuntu VM에서 한다 (TEAM_GUIDE 기준 ARM64). Claude 클라우드 세션에는 대상 커널 헤더가 없고 insmod도 못 하므로, 거기서는 코드 작성·리뷰까지만 하고 빌드 결과는 VM에서 받아 온다
 - 최종 측정은 지정한 VM 한 대에서만 한다
+- 커널 5.4 기준으로 쓴다. 5.4에 없는 것: maple tree(6.1부터), `kthread_complete_and_exit`(5.17부터. 5.4에서는 `complete_and_exit`). 새 API를 쓰기 전에 5.4에 있는지 확인한다
 
 ## 코딩 규칙
 
@@ -71,7 +74,7 @@ docs/             팀 공유 페이지, 역할별 인수인계
 
 ## Git 규칙
 
-- `main` 직접 push 금지. 브랜치: `feat/harness`, `feat/sl-v1`, `feat/sl-v2`, `feat/maple`, `feat/scripts`, `docs/...`
+- `main` 직접 push 금지. 브랜치: `feat/harness`, `feat/sl-v1`, `feat/sl-v2`, `feat/xarray`, `feat/scripts`, `docs/...`
 - PR → 강성준(PM)이 확인·approve → merge. 강성준 본인의 PR은 이은찬이 확인 (`.github/CODEOWNERS`로 리뷰 요청이 자동으로 간다)
 - PR은 단계 하나씩 작게 올리고 `.github/pull_request_template.md`의 체크리스트를 채운다
 - 커밋 메시지 `영역: 무엇을` (예: `harness: add start barrier`)
