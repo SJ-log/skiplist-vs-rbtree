@@ -46,13 +46,7 @@ static unsigned int duration_ms = 3000;
 module_param(duration_ms, uint, 0444);
 MODULE_PARM_DESC(duration_ms, "measurement time in milliseconds");
 
-/*
- * 워커끼리 같은 캐시 라인을 쓰지 않도록 정렬한다.
- * ____cacheline_aligned_in_smp 는 arm64에서 64바이트인데
- * Apple Silicon의 캐시 라인은 128바이트라서 직접 지정한다.
- */
-#define BENCH_CACHE_ALIGN	128
-
+/* false sharing을 막는 정렬 (ds_ops.h 참고) */
 struct bench_worker {
 	struct rnd_state rnd;
 	struct completion done;
