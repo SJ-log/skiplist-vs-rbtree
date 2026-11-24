@@ -29,6 +29,11 @@ static int dummy_remove(u64 key)
 	return 0;
 }
 
+static u64 dummy_range(u64 lo, u64 hi)
+{
+	return 0;
+}
+
 static void dummy_destroy(void)
 {
 }
@@ -39,5 +44,6 @@ struct ds_ops bench_ds = {
 	.insert  = dummy_insert,
 	.search  = dummy_search,
 	.remove  = dummy_remove,
+	.range   = dummy_range,
 	.destroy = dummy_destroy,
 };
