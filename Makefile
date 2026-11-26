@@ -26,3 +26,9 @@ all:
 
 clean:
 	$(MAKE) -C $(KDIR) M=$(CURDIR) clean
+
+# Build validator tests with: make SL_VALIDATE_TEST=1
+ifeq ($(SL_VALIDATE_TEST),1)
+obj-m += test_sl_validate.o
+test_sl_validate-objs := tests/skiplist_validate.o tests/skiplist_validate_test.o
+endif
