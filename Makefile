@@ -8,8 +8,8 @@ bench_dummy-objs := harness/harness.o ds/dummy.o
 # obj-m += bench_rb.o
 # bench_rb-objs := harness/harness.o ds/rbtree_lock.o
 
-# obj-m += bench_sl1.o
-# bench_sl1-objs := harness/harness.o ds/skiplist_v1.o
+obj-m += bench_sl1.o
+bench_sl1-objs := harness/harness.o ds/skiplist_v1.o
 
 # obj-m += bench_sl2.o
 # bench_sl2-objs := harness/harness.o ds/skiplist_v2.o
@@ -31,4 +31,16 @@ clean:
 ifeq ($(SL_VALIDATE_TEST),1)
 obj-m += test_sl_validate.o
 test_sl_validate-objs := tests/skiplist_validate.o tests/skiplist_validate_test.o
+endif
+
+# Build V1 operation tests with: make SL_V1_TEST=1
+ifeq ($(SL_V1_TEST),1)
+obj-m += test_sl1.o
+test_sl1-objs := tests/skiplist_v1_test.o tests/skiplist_validate.o
+endif
+
+# Build concurrent V1 tests with: make SL_V1_CONCURRENT_TEST=1
+ifeq ($(SL_V1_CONCURRENT_TEST),1)
+obj-m += test_sl1_concurrent.o
+test_sl1_concurrent-objs := tests/skiplist_v1_concurrent_test.o tests/skiplist_validate.o
 endif
